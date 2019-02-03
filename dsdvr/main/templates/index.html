@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+    <head>
+        <link rel="stylesheet" href="/static/css/dsdvr.css" type="text/css" />
+        <link rel="stylesheet" href="/static/css/index.css" type="text/css" />
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous" />
+        <link href="https://vjs.zencdn.net/7.4.1/video-js.css" rel="stylesheet">
+    </head>
+
+    <body>
+        <h1>Welcome to DSDVR</h1>
+
+        <div id="app">
+            <a href="/c/" v-on:click.prevent="setupTuners">Configure tuner(s)</a>
+            {% verbatim %}{{ message }}{% endverbatim %}
+
+            <player></player>
+
+            <progressbar percent="48"></progressbar>
+
+            <div id="player">
+                <div class="wrapper">
+                    <div class="videocontent">
+                        <video id="example_video_1" class="video-js vjs-default-skin vjs-16-9 vjs-big-play-centered"
+                               controls preload="auto" width="640" height="264"
+                               data-setup='{"example_option":true}'>
+                            <source src="/api/streams/ef44a452-75be-4a3f-9799-74dd43b48276/hls/stream.m3u8" type="application/x-mpegURL" />
+                        </video>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    
+        <!-- development version, includes helpful console warnings -->
+        <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios@0.12.0/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lodash@4.13.1/lodash.min.js"></script>
+        <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+        <script src="https://vjs.zencdn.net/7.4.1/video.js"></script>
+
+        <script src="/static/js/api.js"></script>
+        <script src="/static/js/index.js"></script>
+
+    </body>
+
+</html>
