@@ -12,20 +12,14 @@ dist/dsdvr-0.1.tar.gz: ${DSDVR}
 container: dist/dsdvr-0.1.tar.gz
 	${DOCKER} build -t ${TAG}:latest .
 
-resetmigrations:
-	rm -rf dsdvr/api/migrations/0*.py*
-	rm -rf dsdvr/db.sqlite3
-	$(MAKE) migrations
-	$(MAKE) migrate
-
 migrations:
-	pipenv run python dsdvr/manage.py makemigrations
+	${MAKE} -c dsdvr
 
 migrate:
-	pipenv run python dsdvr/manage.py migrate
+	${MAKE} -c dsdvr
 
 run:
-	pipenv run python dsdvr/manage.py runserver
+	docker run
 
 clean:
 	rm -rf build dist *.egg-info
