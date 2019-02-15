@@ -192,7 +192,7 @@ LOGGING = {
 CRON = (
     ('*/5 * * * *', 'api.tasks.TaskCleanup'),
     ('* * * * *',   'api.tasks.recordings.TaskRecordingManager'),
-    ('*/15 * * * *',   'api.tasks.Metadata.TaskMetadataManager'),
+    ('*/15 * * * *',   'api.tasks.metadata.TaskMetadataManager'),
 )
 
 # Allow application configuration to be edited in admin.

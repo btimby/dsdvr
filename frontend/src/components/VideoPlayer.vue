@@ -47,8 +47,12 @@ export default {
         // Wait for new stream to be accessible. Then modify the datum bound
         // to the video player src attribute.
         'store.nowPlaying': function (media, oldMedia) {
+            // media is set to null when playback stops.
+            if (media === null)
+                return;
+
             // Set poster and unhide player.
-            this.local.player.poster(`/api/media/${media.id}/poster.jpg`);
+            this.local.player.poster(`/api/media/${media.id}/frame0.jpg`);
             this.local.hidden = false;
 
             // Wait for the stream to become available.
@@ -61,20 +65,28 @@ export default {
             axios.head(media.streamUrl)
                 .then(r => {
                     // Stream is available, start playing...
-                    let src = {
+                    const src = {
                         type: 'application/x-mpegUrl',
                         src: media.streamUrl,
                     };
+
+                    const mediaTitle = media.title;
+                    const mediaDesc = media.subtitle || media.desc;
+
+                    this.local.player.dock({
+                        title: mediaTitle,
+                        description: mediaDesc,
+                    });
+
                     this.local.player.src(src);
 
-                    // NOTE: this is kinda hacky, but setting currentTime()
-                    // before or after play() does not work.
-                    /* this.local.player.one('timeupdate', () => {
-                        
-                    }); */
-
-                    // Start playback in lieu of autoplay...
+                    // Start playback in lieu of autoplay, shortly after
+                    // playback starts set current time to resume location or 0
                     this.local.player.play().then(() => {
+                        // TODO: Here we can check if cursor is near duration
+                        // we just need an accurate duration from the API. If
+                        // cursor _is_ near duration, we should restart
+                        // playback.
                         this.local.player.currentTime(media.streamCursor || 0);
                     });
                 })
@@ -93,18 +105,22 @@ export default {
             fluid: true,
         };
 
-        const player = this.local.player = videojs("videojs-player", options, () => {
+        const player = this.local.player = videojs("videojs-player", options, function() {
             player.on('timeupdate', _.throttle(() => {
+                // NOTE: This can be called after playback has ended, in which
+                // case nowPlaying will be null.
+                if (this.store.nowPlaying === null)
+                    return;
+
                 const currentTime = player.currentTime();
                 const mediaId = this.store.nowPlaying.id;
-
-                console.log(currentTime);
-                axios.patch(`/api/media/${mediaId}/stream/`, { cursor: currentTime });
+                this.$store.updateStreamCursor(mediaId, currentTime);
             }, 4000));
 
-            player.dock({
-                title: this.local.nowPlaying.title,
-                description: this.local.nowPlaying.desc,
+            player.on('ended', () => {
+                console.log('Ended.');
+                this.local.hidden = true;
+                this.$store.stopVideo();
             });
 
             // player.stopButton();
@@ -126,7 +142,7 @@ export default {
             });
 
             player.dvr();
-        });
+        }.bind(this));
     }
 }
 </script>

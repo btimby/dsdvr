@@ -6,7 +6,7 @@ import socket
 import tempfile
 import signal
 import time
-import threading
+import multiprocessing
 import select
 import errno
 import shutil
@@ -169,9 +169,9 @@ def _tail_to_ffmpeg(paths, command):
         command, stdin=subprocess.PIPE, stderr=log_file,
         shell=False)
 
-    t_tail = threading.Thread(target=_tails, args=(process, paths))
-    t_tail.daemon = True
-    t_tail.start()
+    p_tail = multiprocessing.Process(target=_tails, args=(process, paths))
+    p_tail.daemon = True
+    p_tail.start()
 
     return process
 

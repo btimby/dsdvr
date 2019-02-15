@@ -278,12 +278,19 @@ class Media(UpdateMixin, CreatedUpdatedModel):
         Library, on_delete=models.CASCADE, related_name='media')
     path = FilePathField(max_length=256)
     title = models.CharField(max_length=256)
+    subtitle = models.CharField(max_length=256)
+    desc = models.TextField()
     length = models.IntegerField(null=True)
     poster = models.URLField(max_length=256, null=True)
     category = models.ForeignKey(
         Category, on_delete=models.CASCADE, null=True,
         related_name='%(class)ss')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
+    has_metadata = models.BooleanField(default=False)
+    duration = models.DecimalField(null=True, max_digits=12, decimal_places=6)
+    size = models.IntegerField(null=True)
+    format = models.CharField(null=True, max_length=32)
+    audio_enc = models.CharField(null=True, max_length=32)
 
     def ensure_path(self):
         '''
@@ -304,6 +311,8 @@ class ShowManager(DefaultTypeManager):
         defaults = kwargs.copy()
         defaults.update({
             'title': program.title,
+            'subtitle': program.subtitle,
+            'desc': program.desc,
             'length': program.length,
             'poster': program.poster,
             'category': program.category,
@@ -320,6 +329,9 @@ class Show(Media):
         Program, on_delete=models.SET_NULL, null=True, related_name='shows')
     episode = models.ForeignKey(
         Episode, on_delete=models.CASCADE, null=True, related_name='shows')
+    width = models.SmallIntegerField(null=True)
+    height = models.SmallIntegerField(null=True)
+    video_enc = models.CharField(null=True, max_length=32)
 
     def __str__(self):
         return self.program.title
@@ -441,4 +453,8 @@ class MovieManager(DefaultTypeManager):
 
 
 class Movie(Media):
+    width = models.SmallIntegerField(null=True)
+    height = models.SmallIntegerField(null=True)
+    video_enc = models.CharField(null=True, max_length=32)
+
     objects = MovieManager()

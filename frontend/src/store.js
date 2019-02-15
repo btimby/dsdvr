@@ -78,7 +78,8 @@ class Store {
     }
 
     playVideo(media) {
-        // TODO: create a stream and set that to nowPlaying...
+        // TODO: wait for stream to become ready, move code from
+        // VideoPlayer.vue...
         axios.post(`/api/media/${media.id}/stream/`, { 'type': 0 })
             .then(r => {
                 media.streamUrl = r.data.url;
@@ -92,7 +93,21 @@ class Store {
     }
 
     stopVideo() {
+        // NOTE: This is tenuous. I would prefer to detect this condition on
+        // playback also ask the user if they prefer resume or restart. But
+        // also it makes sense to clear the cursor when playback finishes, so
+        // we start with that.
+        this.updateStreamCursor(this.state.nowPlaying.id, 0);
         this.state.nowPlaying = null;
+    }
+
+    updateStreamCursor(mediaId, currentTime) {
+        return axios.patch(
+            `/api/media/${mediaId}/stream/`, { cursor: currentTime })
+        .catch(e => {
+            console.log(e);
+            throw e;
+        });
     }
 }
 

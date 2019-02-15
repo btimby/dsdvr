@@ -71,9 +71,7 @@ def poster(request, pk):
     # it alone may allow the player to rewind etc. The playlist controls the
     # options available to the user.
     media = get_object_or_404(Media, pk=pk)
-
     poster_url = media.poster if media.poster else '/static/images/poster.jpg'
-
     return redirect(poster_url)
 
 
