@@ -3,13 +3,18 @@ import shutil
 import uuid
 import signal
 import logging
+import pathlib
+import random
+import string
 
 from os.path import join as pathjoin
+from os.path import isdir, isfile, exists, relpath, dirname
 from datetime import timedelta
 
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.functional import cached_property
 
 from ua_parser import user_agent_parser
 
@@ -31,14 +36,91 @@ def flatten(d):
     return flat
 
 
-class DirectoryPathField(models.CharField):
+class BasePathField(models.CharField):
     def __init__(self, max_length=256, **kwargs):
+        self.auto_create = kwargs.pop('auto_create', False)
+        self.must_exist = kwargs.pop('must_exist', True)
+        self.relative_to = kwargs.pop('relative_to', None)
         super().__init__(max_length=max_length, **kwargs)
 
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        if self.auto_create:
+            kwargs['auto_create'] = self.auto_create
+        if not self.must_exist:
+            kwargs['must_exist'] = self.must_exist
+        if self.relative_to is not None:
+            kwargs['relative_to'] = self.relative_to
+        return name, path, args, kwargs
 
-class FilePathField(models.CharField):
-    def __init__(self, max_length=256, **kwargs):
-        super().__init__(max_length=max_length, **kwargs)
+    def _check_path(self, path):
+        raise NotImplemented()
+
+    def _create_path(self, path):
+        raise NotImplemented()
+
+    def pre_save(self, model_instance, add):
+        path = getattr(model_instance, self.attname)
+        abs_path = self.absolute(model_instance)
+        base_path = self.basepath(model_instance)
+
+        # Ensure the path is relative.
+        if base_path is not None and path.startswith(base_path):
+            path = relpath(path, base_path)
+
+        if not self.null:
+            if self.auto_create:
+                self._create_path(abs_path)
+
+            if self.must_exist:
+                self._check_path(abs_path)
+
+        return path
+
+    def basepath(self, model_instance):
+        if self.relative_to is not None:
+            objname, _, attname = self.relative_to.partition('.')
+            return getattr(getattr(model_instance, objname), attname)
+
+    def absolute(self, model_instance):
+        path = getattr(model_instance, self.attname)
+
+        if self.relative_to is not None:
+            base = self.basepath(model_instance)
+            path = pathjoin(base, path)
+
+        return path
+
+
+class DirectoryPathField(BasePathField):
+    def _check_path(self, path):
+        if not isdir(path):
+            raise ValueError('Path: %s is not a directory')
+
+    def _create_path(self, path):
+        os.makedirs(path, exist_ok=True)
+
+
+class FilePathField(BasePathField):
+    def __init__(self, **kwargs):
+        self.auto_create_parent = kwargs.pop('auto_create_parent', False)
+        super().__init__(**kwargs)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        if self.auto_create_parent:
+            kwargs['auto_create_parent'] = self.auto_create_parent
+        return name, path, args, kwargs
+
+    def _check_path(self, path):
+        if not isfile(path):
+            raise ValueError('Path: %s is not a file')
+
+    def _create_path(self, path):
+        if self.auto_create_parent or self.auto_create:
+            os.makedirs(dirname(path), exist_ok=True)
+
+        pathlib.Path(path).touch(exist_ok=True)
 
 
 class UpdateMixin(object):
@@ -174,7 +256,7 @@ class Library(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
     name = models.CharField(max_length=32, unique=True)
-    path = DirectoryPathField(unique=True)
+    path = DirectoryPathField(unique=True, must_exist=True, auto_create=True)
 
 
 class Series(UpdateMixin, CreatedModifiedModel):
@@ -276,7 +358,9 @@ class Media(UpdateMixin, CreatedModifiedModel):
     type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
     library = models.ForeignKey(
         Library, on_delete=models.CASCADE, related_name='media')
-    path = FilePathField(max_length=256)
+    path = FilePathField(
+        max_length=256, must_exist=False, auto_create_parent=True,
+        auto_create=False, relative_to='library.path')
     title = models.CharField(max_length=256)
     subtitle = models.CharField(max_length=256)
     desc = models.TextField()
@@ -292,16 +376,9 @@ class Media(UpdateMixin, CreatedModifiedModel):
     audio_enc = models.CharField(null=True, max_length=32)
     play_count = models.IntegerField(default=0)
 
-    def ensure_path(self):
-        '''
-        Generate a unique path for this show. Used by DVR, shows not recorded
-        by DVR will have a path to the existing video file.
-        '''
-        # TODO: We need to follow a human readable naming scheme, but currently
-        # there is not enough data to do so. Thus use the UUID.
-        self.path = pathjoin(self.library.path, str(self.id))
-        os.makedirs(self.path, exist_ok=True)
-        self.save(update_fields=['path'])
+    @cached_property
+    def abs_path(self):
+        return self._meta.get_field('path').absolute(self)
 
 
 class ShowManager(DefaultTypeManager):
@@ -318,9 +395,19 @@ class ShowManager(DefaultTypeManager):
             'category': program.category,
             'rating': program.rating,
         })
+
+        # Generate a path for this program. It will be relative to it's library
+        # root.
+        if 'path' not in defaults:
+            title = program.title.replace(' ', '.')
+            airtime = program.start.strftime('%m-%d-%Y-%H:%M')
+            unique = ''.join(
+                random.choices(string.ascii_letters + string.digits, k=6))
+            defaults['path'] = pathjoin(
+                title, airtime, 'recording0.mpeg')
+
         show, created = self.get_or_create(program=program, defaults=defaults)
         show.update(**defaults)
-        show.ensure_path()
         return show, created
 
 

@@ -41,7 +41,8 @@ class RecordingControl(object):
 
         show, _ = Show.objects.get_or_create_from_program(
             self.recording.program, library=library)
-        recording_path = util.get_next_recording(show.path)
+        import pdb; pdb.set_trace()
+        recording_path = util.get_next_recording(show.abs_path)
 
         command = [
             'ffmpeg', '-loglevel', 'error', '-n', '-i',

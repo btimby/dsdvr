@@ -279,12 +279,6 @@ class LibrarySerializer(QueryFieldsMixin, serializers.ModelSerializer):
     type = DisplayChoiceField(choices=list(Library.TYPE_NAMES.items()))
     media = serializers.ListSerializer(read_only=True, child=MediaSerializer())
 
-    def validate(self, data):
-        if not os.path.isdir(data['path']):
-            raise serializers.ValidationError(
-                '%s is not a directory' % data['path'])
-        return data
-
 
 class MediaRelatedField(serializers.ModelSerializer):
     class Meta:

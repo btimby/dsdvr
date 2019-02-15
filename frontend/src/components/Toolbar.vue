@@ -99,6 +99,8 @@ export default {
             items: [
               { id: 'home', icon: 'dashboard', title: 'Home', route: '/'},
               { id: 'about', icon: 'subject', title: 'About', route: '/about'},
+              { id: 'guide', icon: 'line_style', title: 'Guide', route: '/guide'},
+              { id: 'recordings', icon: 'save_alt', title: 'Recordings', route: '/recordings'},
             ]
           }
         ]

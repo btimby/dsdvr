@@ -242,8 +242,7 @@ class CreatingStreamSerializer(StreamSerializer):
     def create(self, validated_data):
         obj = super().create(validated_data)
 
-        temp = tempfile.mkdtemp(
-            dir=obj.media.path, prefix='.stream-%s-' % obj.id)
+        temp = tempfile.mkdtemp(prefix='.stream-%s-' % obj.id)
         playlist = pathjoin(temp, 'stream.m3u8')
         file_names = util.get_recordings(obj.media.path)
 
