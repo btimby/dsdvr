@@ -165,13 +165,13 @@ def _tails(process, paths):
             process.wait()
 
 
-def _daemonize(command, paths, pid_file_path):
+def _daemonize(command, paths, pid_file):
     '''
     Fork into background so our transcoding won't die with us.
     '''
     with daemon.DaemonContext(
             detach_process=True,
-            pidfile=Pidfile(pid_file_path)):
+            pidfile=pid_file):
 
         log_file_path = pathjoin(dirname(paths[0]), 'ffmpeg.stderr')
         
@@ -184,6 +184,7 @@ def _daemonize(command, paths, pid_file_path):
 
             _tails(process, paths)
 
+
 def _tail_to_ffmpeg(paths, command):
     '''
     Spawn a command and send a number of files to it's stdin.
@@ -191,24 +192,17 @@ def _tail_to_ffmpeg(paths, command):
     LOGGER.info(
         'Piping %i files to: "%s"', len(paths), " ".join(command))
 
-    pid_file_path = pathjoin(dirname(paths[0]), 'ffmpeg.pid')
+    pid_file = Pidfile(pathjoin(dirname(paths[0]), 'ffmpeg.pid'))
 
     # daemon kills the host process, so start an intermediary...
     p_tail = multiprocessing.Process(
-        target=_daemonize, args=(command, paths, pid_file_path))
+        target=_daemonize, args=(command, paths, pid_file))
     p_tail.daemon = False
     p_tail.start()
 
-    pid, start = None, time.time()
-    while time.time() - start < 2:
-        if isfile(pid_file_path):
-            with open(pid_file_path, 'r') as pid_file:
-                pid = int(pid_file.read())
-            os.remove(pid_file_path)
-            break
-        time.sleep(0.1)
-
-    return pid
+    # Once daemonized, our worker will write it's pid to a file... Wait for
+    # that file to appear and then retrieve the pid.
+    return pid_file.poll()
 
 
 class Pidfile(object):
@@ -223,6 +217,24 @@ class Pidfile(object):
 
     def __exit__(self, *args, **kwargs):
         self.file.__exit__(*args, **kwargs)
+        try:
+            os.remove(self.path)
+
+        except (IOError, OSError) as e:
+            LOGGER.exception(e)
+
+    def poll(self, timeout=1):
+        for i in range(10 * timeout):
+            if isfile(self.path):
+                with open(self.path, 'r') as pid_file:
+                    try:
+                        return int(pid_file.read())
+
+                    except ValueError as e:
+                        # NaN? Quit and don't delete file.
+                        LOGGER.exception(e)
+                        break
+            time.sleep(0.1)
 
 
 class CreatingStreamSerializer(StreamSerializer):
