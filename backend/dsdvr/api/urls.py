@@ -21,7 +21,7 @@ from api.views.categories import CategoryViewSet
 from api.views.movies import MovieViewSet
 from api.views.music import MusicViewSet
 from api.views.programs import ProgramViewSet
-from api.views.media import MediaViewSet
+from api.views.media import MediaViewSet, MediaStreamViewSet, poster, frame0
 
 
 router = DefaultRouter()
@@ -47,13 +47,26 @@ urlpatterns = [
     # Custom url patterns here...
     path('streams/<uuid:pk>/hls/stream.m3u8', playlist,
          name='streams-playlist'),
-    path('streams/<uuid:pk>/hls/<name>.ts', segment, name='streams-segment'),
+    # NOTE: slug is import here. It prevents path traversal chars, yet allows
+    # the chars we expect to see as segment file names.
+    path('streams/<uuid:pk>/hls/<slug:name>.ts', segment, name='streams-segment'),
 
     # Standalone viewset that allows file upload and starts the import task.
     path('guide/upload/', GuideUploadViewSet.as_view({'post': 'create'})),
 
     # Standalone view that allows scanning a tuner for new channels.
     path('tuners/<uuid:pk>/scan/', TunerScanView.as_view()),
+
+    # Standalone view that manages media streams.
+    path('media/<uuid:pk>/stream/', MediaStreamViewSet.as_view({
+        'get': 'retrieve',
+        'patch': 'partial_update',
+        'post': 'create',
+        'delete': 'destroy',
+    })),
+
+    path('media/<uuid:pk>/poster.jpg', poster, name='media-poster'),
+    path('media/<uuid:pk>/frame0.jpg', frame0, name='media-frame0'),
 
     # Authentication
     path(

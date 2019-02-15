@@ -1,12 +1,12 @@
 <template>
-    <VideoPlayer></VideoPlayer>
+    <VideoPlayer />
 </template>
 
 <script>
 import VideoPlayer from './VideoPlayer'
 
 export default {
-    name: "media-player",
+    name: "MediaPlayer",
 
     components: {
         VideoPlayer,

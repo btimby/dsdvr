@@ -25,12 +25,18 @@ class Store {
     getRecordings() {
         // Get recordings from the API...
         return axios.get('/api/recordings/')
-            .catch(e => console.log(e));
+            .catch(e => {
+                console.log(e);
+                throw e;
+            });
     }
 
     deleteRecording(recordingId) {
         return axios.delete(`/api/recordings/${recordingId}/`)
-            .catch(e => console.log(e));
+            .catch(e => {
+                console.log(e);
+                throw e;
+            });
     }
 
     getLibraries(options) {
@@ -38,7 +44,10 @@ class Store {
         if (options && !options.media)
             url += '?fields!=media';
         return axios.get(url)
-            .catch(e => console.log(e));
+            .catch(e => {
+                console.log(e);
+                throw e;
+            });
     }
 
     getLibrary(libraryId, options) {
@@ -46,22 +55,40 @@ class Store {
         if (options && !options.media)
             url += '?fields!=media';
         return axios.get(url)
-            .catch(e => console.log(e));
+            .catch(e => {
+                console.log(e);
+                throw e;
+            });
     }
 
     deleteLibrary(libraryId) {
         return axios.delete(`/api/libraries/${libraryId}/`)
-            .catch(e => console.log(e));
+            .catch(e => {
+                console.log(e);
+                throw e;
+            });
     }
 
     getLibraryMedia(libraryId) {
         return axios.get(`/api/libraries/${libraryId}/media/`)
-            .catch(e => console.log(e));
+            .catch(e => {
+                console.log(e);
+                throw e;
+            });
     }
 
-    playVideo(video) {
+    playVideo(media) {
         // TODO: create a stream and set that to nowPlaying...
-        this.state.nowPlaying = video;
+        axios.post(`/api/media/${media.id}/stream/`, { 'type': 0 })
+            .then(r => {
+                media.streamUrl = r.data.url;
+                media.streamCursor = r.data.cursor;
+                this.state.nowPlaying = media;
+            })
+            .catch(e => {
+                console.log(e);
+                throw e;
+            });
     }
 
     stopVideo() {

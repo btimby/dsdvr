@@ -38,7 +38,7 @@
 
 <script>
   export default {
-    name: "recording-button",
+    name: "RecordingButton",
 
     data() {
         return {
@@ -52,6 +52,10 @@
 
     mounted() {
         this.local.recordingIterval = setInterval(() => {
+            // Don't fetch ajax data if a video is playing...
+            if (this.store.nowPlaying)
+                return;
+
             this.$store.getRecordings()
                 .then(r => {
                     this.local.recordings = r.data;

@@ -109,13 +109,13 @@ class TaskGuideImport(BaseTask):
         return actor
 
     @atomic(immediate=True)
-    def _get_channel(self, number=None, name=None, icon=None, id=None):
+    def _get_channel(self, number=None, name=None, poster=None, id=None):
         try:
             channel = Channel.objects.get(
                 number=number,
                 name=name)
 
-            channel.icon = icon
+            channel.poster = poster
             channel.save()
 
             return channel
@@ -179,7 +179,7 @@ class TaskGuideImport(BaseTask):
 
                 # shared fields.
                 elif el.tag == 'icon':
-                    data['icon'] = el.attrib['src']
+                    data['poster'] = el.attrib['src']
                     continue
 
                 # programme fields.

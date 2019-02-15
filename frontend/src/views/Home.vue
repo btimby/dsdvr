@@ -8,7 +8,7 @@
 import Setup from './Setup.vue';
 
 export default {
-  name: 'home',
+  name: 'Home',
 
   components: {
     Setup,

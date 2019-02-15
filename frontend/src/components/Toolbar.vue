@@ -81,7 +81,7 @@ function getGravatar(email, size) {
 }
 
 export default {
-  name: 'toolbar',
+  name: 'Toolbar',
 
   components: {
     TaskGear,

@@ -12,6 +12,7 @@ import errno
 import shutil
 
 from os.path import join as pathjoin
+from os.path import dirname
 
 import psutil
 
@@ -106,6 +107,7 @@ def _tails(process, paths):
     exit due to EOF.
     '''
     for path in paths:
+        written = 0
         # Find processes currently writing to the file.
         pids = _find_writers(path)
         LOGGER.debug(
@@ -125,20 +127,9 @@ def _tails(process, paths):
                 if input_readable and output_writable:
                     data = input.read()
                     if data:
+                        written += len(data)
                         where, last_data = input.tell(), time.time()
-
-                        try:
-                            process.stdin.write(data)
-
-                        except IOError as e:
-                            if e.errno == errno.EPIPE:
-                                # Broken pipe error indicates process died.
-                                r = process.poll()
-                                if r is not None:
-                                    LOGGER.error(
-                                        'ffmpeg BROKEN PIPE with error %i: %s',
-                                        r, util.last_3_lines(process.stderr))
-                            raise
+                        process.stdin.write(data)
 
                     elif not pids and not input_readable:
                         # No writers, EOF
@@ -155,6 +146,8 @@ def _tails(process, paths):
         finally:
             input.close()
 
+        LOGGER.debug('Wrote %i bytes from %s', written, path)
+
     # As desired, ffmpeg dies when we do this...
     process.stdin.close()
     process.wait()
@@ -168,9 +161,13 @@ def _tail_to_ffmpeg(paths, command):
     LOGGER.info(
         'Piping %i files to: "%s"', len(paths), " ".join(command))
 
+    log_file = open(pathjoin(dirname(paths[0]), 'ffmpeg.stderr'), 'ab')
+    log_file.write(b'\n%s\n\n' % (' '.join(command)).encode('utf8'))
+    log_file.flush()
+
     process = subprocess.Popen(
-        command, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-        encoding='utf8', shell=False)
+        command, stdin=subprocess.PIPE, stderr=log_file,
+        shell=False)
 
     t_tail = threading.Thread(target=_tails, args=(process, paths))
     t_tail.daemon = True
@@ -192,7 +189,7 @@ class CreatingStreamSerializer(StreamSerializer):
         # TODO: we need to detect the existing format and decide whether to
         # transcode or copy.
         command = [
-            'ffmpeg', '-i', 'pipe:0', '-c:v', 'h264',  # '-loglevel', 'fatal'
+            'ffmpeg', '-loglevel', 'error', '-i', 'pipe:0', '-c:v', 'h264',
             '-c:a', 'copy', '-flags', '+cgop', '-g', '30', '-hls_list_size',
             '0', '-hls_time', '3', playlist,
         ]
@@ -205,13 +202,7 @@ class CreatingStreamSerializer(StreamSerializer):
         return obj
 
     def delete(self, pk):
-        obj = get_object_or_404(Stream, pk=pk)
-        # TODO: move this to model: Stream.delete()
-        if obj.pid is not None:
-            os.kill(obj.pid, signal.SIGINT)
-        if obj.path is not None:
-            shutil.rmtree(obj.path, ignore_errors=True)
-        obj.delete()
+        get_object_or_404(Stream, pk=pk).delete()
         return Response('', status=status.HTTP_204_NO_CONTENT)
 
 

@@ -6,6 +6,9 @@ import time
 
 from datetime import timedelta
 
+from os.path import join as pathjoin
+from os.path import dirname
+
 import psutil
 
 from django.utils import timezone
@@ -41,15 +44,25 @@ class RecordingControl(object):
         recording_path = util.get_next_recording(show.path)
 
         command = [
-            'ffmpeg', '-n', '-i',  # '-loglevel', 'fatal', 
+            'ffmpeg', '-loglevel', 'error', '-n', '-i',
             self.recording.program.channel.stream, '-c:v', 'copy', '-pix_fmt',
             'yuv420p', '-c:a', 'aac', '-profile:a', 'aac_low', '-f', 'mpegts',
             recording_path,
         ]
 
+        if recording_path.endswith('recording0.mpeg'):
+            frame0_path = pathjoin(dirname(recording_path), 'frame0.jpg')
+            command.extend([
+                '-vframes', '1', '-f', 'image2', frame0_path
+            ])
+
+        log_file = open(
+            pathjoin(dirname(recording_path), 'ffmpeg.stderr'), 'ab')
+        log_file.write(b'\n%s\n\n' % (' '.join(command).encode('utf8')))
+        log_file.flush()
+
         LOGGER.info('Spawning: "%s"', " ".join(command))
-        process = subprocess.Popen(
-            command, stderr=subprocess.PIPE, encoding='utf8')
+        process = subprocess.Popen(command, stderr=log_file, shell=False)
         self.recording.update(
             show=show, status=Recording.STATUS_RECORDING, pid=process.pid)
 
@@ -105,7 +118,7 @@ class RecordingControl(object):
         # TODO: Here is where we would skip commercials etc.
         path = self.recording.show.path
         file_names = util.get_recordings(path)
-        util.combine_recordings(path, file_names[1:])
+        util.combine_recordings(file_names[0], file_names[1:])
 
     def _stop_recording(self, process=None):
         process = self._get_process()

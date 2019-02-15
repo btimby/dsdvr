@@ -1,9 +1,149 @@
-from rest_framework import serializers, viewsets
+import logging
+import subprocess
+import errno
 
-from api.models import Media
-from api.serializers import MediaSerializer
+from os.path import isfile
+from os.path import dirname
+from os.path import join as pathjoin
+
+import ffmpeg
+
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404, redirect
+
+from rest_framework import serializers, viewsets, views
+from rest_framework.response import Response
+from rest_framework import status
+
+from api.models import Media, Stream
+from api.serializers import MediaSerializer, StreamSerializer
+from api.views.streams import CreatingStreamSerializer
+
+
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(logging.NullHandler())
+
+
+def make_frame0(media_path, frame0_path):
+    ffmpeg \
+        .input(media_path) \
+        .output(frame0_path, '-y', vframes=1, f='image2') \
+        .run()
 
 
 class MediaViewSet(viewsets.ModelViewSet):
     serializer_class = MediaSerializer
     queryset = Media.objects.all()
+
+
+class MediaStreamViewSet(viewsets.ModelViewSet):
+    serializer_class = CreatingStreamSerializer
+    queryset = Stream.objects.all()
+    lookup_field = 'media__pk'
+    lookup_url_kwarg = 'pk'
+
+    def create(self, request, pk=None):
+        media = get_object_or_404(Media, pk=pk)
+        try:
+            serializer = StreamSerializer(media.stream)
+
+        except Stream.DoesNotExist:
+
+            data = {
+                'media': pk,
+                'type': request.data.get('type', 0)
+            }
+            serializer = CreatingStreamSerializer(data=data)
+
+            if serializer.is_valid():
+                serializer.save()
+
+        return Response(serializer.data)
+
+    def partial_update(self, request, pk=None):
+        request.data['media.id'] = pk
+        return super().partial_update(request, pk=pk)
+
+
+def poster(request, pk):
+    # TODO: we may wish to generate or modify this playlist. Although leaving
+    # it alone may allow the player to rewind etc. The playlist controls the
+    # options available to the user.
+    media = get_object_or_404(Media, pk=pk)
+
+    poster_url = media.poster if media.poster else '/static/images/poster.jpg'
+
+    return redirect(poster_url)
+
+
+def frame0(request, pk):
+    # TODO: we may wish to generate or modify this playlist. Although leaving
+    # it alone may allow the player to rewind etc. The playlist controls the
+    # options available to the user.
+    media = get_object_or_404(Media, pk=pk)
+    media_path = pathjoin(media.path, 'recording0.mpeg')
+    frame0_path = pathjoin(media.path, 'frame0.jpg')
+
+    if not isfile(media_path):
+        raise Http404()
+
+    if not isfile(frame0_path):
+        make_frame0(media_path, frame0_path)
+
+    try:
+        frame0_file = open(frame0_path, 'rb')
+
+    except IOError as e:
+        if e.errno != errno.ENOENT:
+            raise
+        raise Http404()
+
+    return FileResponse(frame0_file)
+
+
+""" class MediaStreamView(views.APIView):
+    def post(self, request, pk=None):
+        media = get_object_or_404(Media, pk=pk)
+        try:
+            serializer = StreamSerializer(media.stream)
+
+        except Stream.DoesNotExist:
+
+            data = {
+                'media.id': pk,
+                'type': request.data.get('type', 0)
+            }
+            serializer = CreatingStreamSerializer(data=data)
+
+            if serializer.is_valid():
+                serializer.save()
+
+        return Response(serializer.data)
+
+    def get(self, request, pk=None):
+        media = get_object_or_404(Media, pk=pk)
+
+        try:
+            serializer = StreamSerializer(media.stream)
+
+        except Stream.DoesNotExist:
+            raise Http404()
+
+        return Response(serializer.data)
+
+    def delete(self, request, pk=None):
+        media = get_object_or_404(Media, pk=pk)
+
+        try:
+            stream = media.stream
+
+        except Stream.DoesNotExist:
+            raise Http404()
+
+        else:
+            stream.delete()
+
+        return Response('', status.HTTP_204_NO_CONTENT)
+
+    def patch(self, request) """

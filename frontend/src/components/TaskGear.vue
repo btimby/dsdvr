@@ -45,7 +45,7 @@
 // TODO: This component is very much like RecordingButton.vue, the can be consolidated.
 
   export default {
-    name: "task-gear",
+    name: "TaskGear",
 
     data() {
         return {
@@ -59,6 +59,10 @@
 
     mounted() {
         this.local.taskInterval = setInterval(() => {
+            // Don't fetch ajax data if a video is playing...
+            if (this.store.nowPlaying)
+                return;
+
             this.$store.getTasks()
                 .then(r => {
                     this.local.tasks = r.data;

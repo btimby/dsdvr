@@ -1,5 +1,8 @@
 import os
+import shutil
 import uuid
+import signal
+import logging
 
 from os.path import join as pathjoin
 from datetime import timedelta
@@ -9,6 +12,11 @@ from django.db.models import Q
 from django.utils import timezone
 
 from ua_parser import user_agent_parser
+
+
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(logging.NullHandler())
 
 
 def flatten(d):
@@ -142,7 +150,7 @@ class Channel(UpdateMixin, CreatedUpdatedModel):
     number = models.CharField(max_length=8)
     name = models.CharField(max_length=8)
     stream = models.CharField(max_length=256, null=True)
-    icon = models.URLField(max_length=256, null=True)
+    poster = models.URLField(max_length=256, null=True)
     hd = models.BooleanField(default=False)
 
     def __str__(self):
@@ -241,7 +249,7 @@ class Program(UpdateMixin, CreatedUpdatedModel):
     start = models.DateTimeField()
     stop = models.DateTimeField()
     length = models.IntegerField()
-    icon = models.URLField(max_length=256, null=True)
+    poster = models.URLField(max_length=256, null=True)
     previously_shown = models.BooleanField(default=True)
 
     def __str__(self):
@@ -271,7 +279,7 @@ class Media(UpdateMixin, CreatedUpdatedModel):
     path = FilePathField(max_length=256)
     title = models.CharField(max_length=256)
     length = models.IntegerField(null=True)
-    icon = models.URLField(max_length=256, null=True)
+    poster = models.URLField(max_length=256, null=True)
     category = models.ForeignKey(
         Category, on_delete=models.CASCADE, null=True,
         related_name='%(class)ss')
@@ -297,7 +305,7 @@ class ShowManager(DefaultTypeManager):
         defaults.update({
             'title': program.title,
             'length': program.length,
-            'icon': program.icon,
+            'poster': program.poster,
             'category': program.category,
             'rating': program.rating,
         })
@@ -337,7 +345,20 @@ class Stream(UpdateMixin, CreatedUpdatedModel):
     type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
     path = DirectoryPathField(null=True)
     pid = models.IntegerField(null=True)
-    resume_seconds = models.IntegerField(null=True)
+    cursor = models.DecimalField(max_digits=12, decimal_places=6, default=0.0)
+
+    def delete(self, *args, **kwargs):
+        if self.pid is not None:
+            try:
+                os.kill(self.pid, signal.SIGINT)
+
+            except ProcessLookupError as e:
+                LOGGER.warning(e, exc_info=True)
+
+        if self.path is not None:
+            shutil.rmtree(self.path, ignore_errors=True)
+
+        return super().delete(*args, **kwargs)
 
 
 class Recording(UpdateMixin, CreatedUpdatedModel):
@@ -379,17 +400,27 @@ class Recording(UpdateMixin, CreatedUpdatedModel):
             now = timezone.now()
         return now >= self.stop
 
+    def delete(self, *args, **kwargs):
+        if self.pid:
+            try:
+                os.kill(self.pid, signal.SIGINT)
+
+            except ProcessLookupError as e:
+                LOGGER.warning(e, exc_info=True)
+
+        return super().delete(*args, **kwargs)
+
 
 class Artist(UpdateMixin, CreatedUpdatedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256)
-    icon = models.URLField(max_length=256, null=True)
+    poster = models.URLField(max_length=256, null=True)
 
 
 class Album(UpdateMixin, CreatedUpdatedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256)
-    icon = models.URLField(max_length=256, null=True)
+    poster = models.URLField(max_length=256, null=True)
 
 
 class MusicManager(DefaultTypeManager):

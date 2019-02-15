@@ -26,7 +26,7 @@
             <div style="text-align: center" class="mb-4">
                 <div class="bounding-box"
                      style="display: table; margin: 0 auto"
-                     v-bind:style="{ backgroundImage: `url(${(props.item.icon || '/static/images/poster.jpg')})` }">
+                     v-bind:style="{ backgroundImage: `url('/api/media/${props.item.id}/poster.jpg')` }">
                     <img
                          @click.stop="playVideo(props.item)"
                          src="/static/images/play-button.png"
@@ -57,8 +57,9 @@
 </template>
 
 <script>
-// TODO: This component is very much like TaskGear.vue, the can be consolidated.
 export default {
+    name: 'Library',
+
     data() {
         return {
             local: {

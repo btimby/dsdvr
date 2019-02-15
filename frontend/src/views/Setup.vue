@@ -72,7 +72,7 @@
 
 <script>
 export default {
-    name: 'setup',
+    name: 'Setup',
 
     data() {
         return {

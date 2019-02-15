@@ -1,5 +1,5 @@
 module.exports = {
-    "extends": "eslint:recommended",
+    "extends": "plugin:vue/recommended",
     "rules": {
         // disable rules from base configurations
         "no-console": "off",

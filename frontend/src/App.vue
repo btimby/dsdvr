@@ -4,7 +4,7 @@
 
     <v-content class="mx-4">
       <router-view />
-      <MediaPlayer></MediaPlayer>
+      <MediaPlayer />
     </v-content>
   </v-app>
 </template>
@@ -14,7 +14,7 @@ import MediaPlayer from '@/components/MediaPlayer'
 import Toolbar from '@/components/Toolbar'
 
 export default {
-  name: 'app',
+  name: 'App',
 
   components: {
     MediaPlayer,

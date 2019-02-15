@@ -1,3 +1,4 @@
+import logging
 import os.path
 
 from collections import OrderedDict
@@ -16,6 +17,11 @@ from api.models import (
 )
 from api.tasks import STATUS_NAMES
 from api.tasks.recordings import RecordingControl
+
+
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(logging.NullHandler())
 
 
 class DisplayChoiceField(serializers.ChoiceField):
@@ -39,15 +45,30 @@ class EpisodeSerializer(serializers.ModelSerializer):
 class ProgramRelatedField(serializers.ModelSerializer):
     class Meta:
         model = Program
-        fields = ('id', 'title', 'start', 'stop', 'length', 'icon',
+        fields = ('id', 'title', 'start', 'stop', 'length', 'poster',
                   'previously_shown', 'channel', 'episode', 'category',
                   'rating')
-        read_only_fields = ('title', 'start', 'stop', 'length', 'icon',
+        read_only_fields = ('title', 'start', 'stop', 'length', 'poster',
                             'previously_shown', 'channel', 'episode',
                             'category', 'rating')
 
     channel = serializers.StringRelatedField(read_only=True)
     episode = serializers.StringRelatedField(read_only=True)
+    category = serializers.SlugRelatedField(
+        read_only=True, slug_field='name')
+    rating = serializers.SlugRelatedField(
+        read_only=True, slug_field='name')
+
+
+class MediaRelatedField(serializers.ModelSerializer):
+    class Meta:
+        model = Media
+        fields = ('id', 'type', 'library', 'path', 'title', 'length', 'poster',
+                  'category', 'rating')
+        read_only_fields = ('type', 'library', 'path', 'title', 'length',
+                            'poster', 'category', 'rating')
+
+    library = serializers.StringRelatedField(read_only=True)
     category = serializers.SlugRelatedField(
         read_only=True, slug_field='name')
     rating = serializers.SlugRelatedField(
@@ -109,9 +130,6 @@ class RecordingSerializer(serializers.ModelSerializer):
     program = ProgramRelatedField()
 
     def _validate_tuner(self, data):
-        # Get the tuner id that will be used for the requested recording.
-        tuner_id = data['program'].channel.tuner_id
-        
         # Find out what is recording during this time slot.
         start, stop = data['start'], data['stop']
         q1 = models.Q(
@@ -123,17 +141,23 @@ class RecordingSerializer(serializers.ModelSerializer):
         tuners = Tuner.objects.filter(q1 | q2) \
             .values_list('id', 'tuner_count')
 
-        # Count recordings on the tuners and note their tuner_counts.
-        tcounts, trecs = OrderedDict(), OrderedDict()
+        if not tuners:
+            return
+
+        # Get the tuner id that will be used for the requested recording.
+        tuner_id = data['program'].channel.tuner_id
+
+        # Holds recording count for each tuner.    
+        trecs = {
+            # Account for the recording we are trying to create.
+            tuner_id: 1,
+        }
+
         for id, tcount in tuners:
-            tcounts[id] = tcount
-            trecs[id] = trecs.get(id, 0) + 1
+            # Count recordings on the tuners.
+            trec = trecs[id] = trecs.get(id, 0) + 1
 
-        # Account for the recording we are trying to create.
-        trecs[tuner_id] = trecs.get(tuner_id, 0) + 1
-
-        # If there will be too many scheduled recordings, fail validation.
-        for ((id, tcount), (_, trec)) in zip(tcounts.items(), trecs.items()):
+            # If recordings exceed available tuners, fail validation.
             if trec > tcount:
                 raise serializers.ValidationError(
                     'Cannot exceed tuner count. Tuner: %s has %i tuners, all '
@@ -313,13 +337,11 @@ class StreamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Stream
         fields = '__all__'
-        read_only_fields = ('id', 'pid', 'media', 'path')
+        read_only_fields = ('id', 'pid', 'path')
         extra_kwargs = {
             'resume_seconds': {'required': False},
         }
 
-    media = serializers.HyperlinkedRelatedField(
-        queryset=Media.objects.all(), view_name='media-detail')
     type = DisplayChoiceField(
         choices=list(Stream.TYPE_NAMES.items()))
     url = serializers.SerializerMethodField()
