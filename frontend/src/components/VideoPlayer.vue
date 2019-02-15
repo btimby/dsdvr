@@ -2,7 +2,7 @@
     <div :class="{ 'vjs-hide': local.hidden }" id="player-overlay">
         <video
             id="videojs-player"
-            class="video-js vjs-default-skin vjs-big-play-centered"
+            class="video-js vjs-default-skin"
             controls
             preload="auto"
             width="80%"
@@ -23,7 +23,7 @@ import vjsStopButton from 'videojs-stop-button';
 import vjsUpNext from 'videojs-upnext';
 import vjsDvr from 'videojs-dvr';
 
-/* Video player styles. */
+/* Video player and plugin styles. */
 import 'video.js/dist/video-js.css';
 import 'videojs-dock/dist/videojs-dock.css';
 import 'videojs-seek-buttons/dist/videojs-seek-buttons.css';
@@ -53,6 +53,8 @@ export default {
 
             // Set poster and unhide player.
             this.local.player.poster(`/api/media/${media.id}/frame0.jpg`);
+            // Start spinner.
+            this.local.player.addClass('vjs-waiting');
             this.local.hidden = false;
 
             // Wait for the stream to become available.
@@ -78,6 +80,8 @@ export default {
                         description: mediaDesc,
                     });
 
+                    // Stop spinner and set media URL.
+                    this.local.player.removeClass('vjs-waiting');
                     this.local.player.src(src);
 
                     // Start playback in lieu of autoplay, shortly after
@@ -91,6 +95,8 @@ export default {
                     });
                 })
                 .catch(e => {
+                    // TODO: Need to count our retries and eventually report
+                    // an error.
                     setTimeout(function() {
                         this.testStreamUrl(media);
                     }.bind(this), 3000);
@@ -103,6 +109,8 @@ export default {
             liveui: true,
             aspectRatio: '16:9',
             fluid: true,
+            // NOTE: big play button looks dumb behind spinner.
+            bigPlayButton: false,
         };
 
         const player = this.local.player = videojs("videojs-player", options, function() {
@@ -179,4 +187,13 @@ video[poster]{
     background-size: cover;
     background-position: inherit;
 }
+
+/* Hide big play button */
+.video-js .vjs-big-play-button {
+    display: none;
+}
+.video-js .vjs-control-bar {
+    display: flex;
+}
+
 </style>

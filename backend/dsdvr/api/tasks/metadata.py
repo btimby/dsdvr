@@ -75,8 +75,8 @@ class TaskMetadataManager(BaseTask):
 
             queryset = Show.objects.all()
             for show in queryset:
-                self._ffprobe_video(music)
-                self._omdb_show(music)
+                self._ffprobe_video(show)
+                self._omdb_show(show)
 
             queryset = Music.objects.all()
             for music in queryset:

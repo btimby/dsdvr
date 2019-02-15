@@ -13,10 +13,10 @@ container: dist/dsdvr-0.1.tar.gz
 	${DOCKER} build -t ${TAG}:latest .
 
 migrations:
-	${MAKE} -c dsdvr
+	${MAKE} -C backend $@
 
 migrate:
-	${MAKE} -c dsdvr
+	${MAKE} -C backend $@
 
 run:
 	docker run

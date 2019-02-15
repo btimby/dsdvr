@@ -10,6 +10,7 @@ import ffmpeg
 
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
+from django.db.models import F
 
 from rest_framework import serializers, viewsets, views
 from rest_framework.response import Response
@@ -58,6 +59,9 @@ class MediaStreamViewSet(viewsets.ModelViewSet):
 
             if serializer.is_valid():
                 serializer.save()
+
+        Media.objects.filter(pk=media.id) \
+            .update(play_count=F('play_count') + 1)
 
         return Response(serializer.data)
 

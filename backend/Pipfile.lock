@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "07c33f8b88046a1eb88549fb4bf2a2c1cd70bb8abae13f2dee40a60e0f439958"
+            "sha256": "d11668f43731a73d60f26d5c481addb477ea6434e6df30e42514178a0c879040"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -119,6 +119,14 @@
             "index": "pypi",
             "version": "==0.6.2"
         },
+        "docutils": {
+            "hashes": [
+                "sha256:02aec4bd92ab067f6ff27a38a38a41173bf01bed8f89157768c1573f53e474a6",
+                "sha256:51e64ef2ebfb29cae1faa133b3710143496eca21c530f3f71424d77687764274",
+                "sha256:7a4bd47eaf6596e1295ecb11361139febe29b084a87bf005bf899f9a42edc3c6"
+            ],
+            "version": "==0.14"
+        },
         "drf-ujson": {
             "hashes": [
                 "sha256:a4cd6a96eabe8357db9efe5aacf78b3856d2cb13b387aadb4f125fb03adf1324"
@@ -209,6 +217,13 @@
             "git": "https://github.com/btimby/python-libhdhomerun.git",
             "ref": "540d52f1c620e65ccc3a6db2b907c60ea232c8c2"
         },
+        "lockfile": {
+            "hashes": [
+                "sha256:6aed02de03cba24efabcd600b30540140634fc06cfa603822d508d5361e9f799",
+                "sha256:6c3cb24f344923d30b2785d5ad75182c8ea7ac1b6171b08657258ec7429d50fa"
+            ],
+            "version": "==0.12.2"
+        },
         "m3u8": {
             "git": "https://github.com/btimby/m3u8.git",
             "ref": "54f365565443a164f07fb8e3447fbcf540fc873f"
@@ -271,6 +286,14 @@
             ],
             "index": "pypi",
             "version": "==2.2.2"
+        },
+        "python-daemon": {
+            "hashes": [
+                "sha256:1d9a541f74822ac87045163ebd5473f9a7b22ab4031ed28293aba81fdaf6c156",
+                "sha256:affeca9e5adfce2666a63890af9d6aff79f670f7511899edaddca7f96593cc25"
+            ],
+            "index": "pypi",
+            "version": "==2.2.3"
         },
         "python-dateutil": {
             "hashes": [

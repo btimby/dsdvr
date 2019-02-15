@@ -45,10 +45,10 @@ class EpisodeSerializer(serializers.ModelSerializer):
 class ProgramRelatedField(serializers.ModelSerializer):
     class Meta:
         model = Program
-        fields = ('id', 'title', 'start', 'stop', 'length', 'poster',
+        fields = ('id', 'title', 'start', 'stop', 'duration', 'poster',
                   'previously_shown', 'channel', 'episode', 'category',
                   'rating')
-        read_only_fields = ('title', 'start', 'stop', 'length', 'poster',
+        read_only_fields = ('title', 'start', 'stop', 'duration', 'poster',
                             'previously_shown', 'channel', 'episode',
                             'category', 'rating')
 
@@ -63,9 +63,9 @@ class ProgramRelatedField(serializers.ModelSerializer):
 class MediaRelatedField(serializers.ModelSerializer):
     class Meta:
         model = Media
-        fields = ('id', 'type', 'library', 'path', 'title', 'length', 'poster',
-                  'category', 'rating')
-        read_only_fields = ('type', 'library', 'path', 'title', 'length',
+        fields = ('id', 'type', 'library', 'path', 'title', 'duration',
+                  'poster', 'category', 'rating')
+        read_only_fields = ('type', 'library', 'path', 'title', 'duration',
                             'poster', 'category', 'rating')
 
     library = serializers.StringRelatedField(read_only=True)

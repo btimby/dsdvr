@@ -203,11 +203,11 @@ class TaskGuideImport(BaseTask):
                     unit = el.attrib['units']
 
                     if unit == 'seconds':
-                        data['length'] = int(el.text) / 60
+                        data['duration'] = int(el.text)
                     elif unit == 'minutes':
-                        data['length'] = int(el.text)
+                        data['duration'] = int(el.text) * 60
                     elif unit == 'hours':
-                        data['length'] = int(el.text) * 60
+                        data['duration'] = int(el.text) * 60 * 60
                     else:
                         LOGGER.warning(
                             'length unit: %s unrecognized', el.attrib['units'])
@@ -230,9 +230,9 @@ class TaskGuideImport(BaseTask):
                         continue
 
                     # Calculate program length if not provided.
-                    if 'length' not in data:
-                        data['length'] = int(
-                            (data['stop'] - data['start']).total_seconds() / 60
+                    if 'duration' not in data:
+                        data['duration'] = int(
+                            (data['stop'] - data['start']).total_seconds()
                         )
 
                     channel = data.pop('channel')

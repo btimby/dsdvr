@@ -48,7 +48,7 @@ class UpdateMixin(object):
         self.save(update_fields=list(kwargs.keys()))
 
 
-class CreatedUpdatedModel(models.Model):
+class CreatedModifiedModel(models.Model):
     class Meta:
         abstract = True
 
@@ -60,7 +60,7 @@ class CreatedUpdatedModel(models.Model):
         if self.created is None:
             self.created = timezone.now()
         self.modified = timezone.now()
-        return super(CreatedUpdatedModel, self).save(*args, **kwargs)
+        return super(CreatedModifiedModel, self).save(*args, **kwargs)
 
 
 class DefaultTypeQuerySet(models.query.QuerySet):
@@ -84,7 +84,7 @@ class DefaultTypeManager(models.Manager):
             default_type=self.DEFAULT_TYPE)
 
 
-class Setting(UpdateMixin, CreatedUpdatedModel):
+class Setting(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256)
     value = models.CharField(max_length=256)
@@ -110,7 +110,7 @@ class DeviceManager(models.Manager):
             model=self.model, using=self._db, hints=self._hints)
 
 
-class Device(UpdateMixin, CreatedUpdatedModel):
+class Device(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     user_agent = models.TextField(unique=True)
     last_ip_address = models.GenericIPAddressField(null=True)
@@ -130,7 +130,7 @@ class Device(UpdateMixin, CreatedUpdatedModel):
     objects = DeviceManager()
 
 
-class Tuner(UpdateMixin, CreatedUpdatedModel):
+class Tuner(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=32, unique=True)
     ipaddr = models.GenericIPAddressField()
@@ -138,7 +138,7 @@ class Tuner(UpdateMixin, CreatedUpdatedModel):
     tuner_count = models.SmallIntegerField()
 
 
-class Channel(UpdateMixin, CreatedUpdatedModel):
+class Channel(UpdateMixin, CreatedModifiedModel):
     class Meta:
         unique_together = (
             ('tuner', 'number'),
@@ -160,7 +160,7 @@ class Channel(UpdateMixin, CreatedUpdatedModel):
         return 'Channel: %s' % str(self)
 
 
-class Library(UpdateMixin, CreatedUpdatedModel):
+class Library(UpdateMixin, CreatedModifiedModel):
     TYPE_MOVIES = 0
     TYPE_SHOWS = 1
     TYPE_MUSIC = 2
@@ -177,12 +177,12 @@ class Library(UpdateMixin, CreatedUpdatedModel):
     path = DirectoryPathField(unique=True)
 
 
-class Series(UpdateMixin, CreatedUpdatedModel):
+class Series(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=128, unique=True)
 
 
-class Episode(UpdateMixin, CreatedUpdatedModel):
+class Episode(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     series = models.ForeignKey(
         Series, on_delete=models.CASCADE, related_name='episodes')
@@ -191,17 +191,17 @@ class Episode(UpdateMixin, CreatedUpdatedModel):
     episode = models.CharField(max_length=32)
 
 
-class Category(UpdateMixin, CreatedUpdatedModel):
+class Category(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=128)
 
 
-class Rating(UpdateMixin, CreatedUpdatedModel):
+class Rating(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=16)
 
 
-class Actor(UpdateMixin, CreatedUpdatedModel):
+class Actor(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=16)
 
@@ -227,7 +227,7 @@ class ProgramManager(models.Manager):
         return queryset
 
 
-class Program(UpdateMixin, CreatedUpdatedModel):
+class Program(UpdateMixin, CreatedModifiedModel):
     class Meta:
         unique_together = (
             ('channel', 'start'),
@@ -248,7 +248,7 @@ class Program(UpdateMixin, CreatedUpdatedModel):
     desc = models.TextField()
     start = models.DateTimeField()
     stop = models.DateTimeField()
-    length = models.IntegerField()
+    duration = models.IntegerField()
     poster = models.URLField(max_length=256, null=True)
     previously_shown = models.BooleanField(default=True)
 
@@ -261,7 +261,7 @@ class Program(UpdateMixin, CreatedUpdatedModel):
     objects = ProgramManager()
 
 
-class Media(UpdateMixin, CreatedUpdatedModel):
+class Media(UpdateMixin, CreatedModifiedModel):
     TYPE_MOVIE = 0
     TYPE_MUSIC = 1
     TYPE_SHOW = 2
@@ -280,7 +280,6 @@ class Media(UpdateMixin, CreatedUpdatedModel):
     title = models.CharField(max_length=256)
     subtitle = models.CharField(max_length=256)
     desc = models.TextField()
-    length = models.IntegerField(null=True)
     poster = models.URLField(max_length=256, null=True)
     category = models.ForeignKey(
         Category, on_delete=models.CASCADE, null=True,
@@ -291,6 +290,7 @@ class Media(UpdateMixin, CreatedUpdatedModel):
     size = models.IntegerField(null=True)
     format = models.CharField(null=True, max_length=32)
     audio_enc = models.CharField(null=True, max_length=32)
+    play_count = models.IntegerField(default=0)
 
     def ensure_path(self):
         '''
@@ -313,7 +313,7 @@ class ShowManager(DefaultTypeManager):
             'title': program.title,
             'subtitle': program.subtitle,
             'desc': program.desc,
-            'length': program.length,
+            'duration': program.duration,
             'poster': program.poster,
             'category': program.category,
             'rating': program.rating,
@@ -342,7 +342,7 @@ class Show(Media):
     objects = ShowManager()
 
 
-class Stream(UpdateMixin, CreatedUpdatedModel):
+class Stream(UpdateMixin, CreatedModifiedModel):
     TYPE_HLS = 0
     TYPE_RAW = 1
 
@@ -373,7 +373,7 @@ class Stream(UpdateMixin, CreatedUpdatedModel):
         return super().delete(*args, **kwargs)
 
 
-class Recording(UpdateMixin, CreatedUpdatedModel):
+class Recording(UpdateMixin, CreatedModifiedModel):
     STATUS_NONE = 0
     STATUS_RECORDING = 1
     STATUS_ERROR = 2
@@ -423,13 +423,13 @@ class Recording(UpdateMixin, CreatedUpdatedModel):
         return super().delete(*args, **kwargs)
 
 
-class Artist(UpdateMixin, CreatedUpdatedModel):
+class Artist(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256)
     poster = models.URLField(max_length=256, null=True)
 
 
-class Album(UpdateMixin, CreatedUpdatedModel):
+class Album(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256)
     poster = models.URLField(max_length=256, null=True)
