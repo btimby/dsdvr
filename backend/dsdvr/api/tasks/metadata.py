@@ -8,10 +8,10 @@ from ffmpeg._run import Error as FfmpegError
 from django.db.transaction import atomic
 
 from api.tasks import BaseTask
-from api.settings import OMDB_API_KEY
 from api.models import (
-    Library, Media, Series, Category, Rating, Episode, Person, MediaActor,
+    Media, Series, Category, Rating, Episode, Person, MediaActor,
 )
+from main.settings import OMDB_API_KEY
 
 
 LOGGER = logging.getLogger(__name__)
@@ -106,8 +106,7 @@ def omdb(media):
             actors.append(person)
 
     if info['type'] == 'series':
-        series, _ = Series.objects.get_or_create(
-            library=media.library, title=metadata['title'])
+        series, _ = Series.objects.get_or_create(title=metadata['title'])
         series.update(**metadata)
 
         # Guide data _may_ provide these at some point...
@@ -135,7 +134,7 @@ def omdb(media):
 
 class TaskMetadataFetch(BaseTask):
     '''
-    Fetch metadata for a media item or library.
+    Fetch metadata for a media item.
     '''
 
     lock = threading.Lock()
@@ -150,14 +149,7 @@ class TaskMetadataFetch(BaseTask):
             return
 
         try:
-            if isinstance(obj, Library):
-                queryset = Media.objects.filter(library=library)
-
-            else:
-                queryset = Media.objects.filter(pk=obj.pk)
-
-            for media in queryset:
-                self._get_metadata(media)
+            self._get_metadata(media)
 
         finally:
             self.lock.release()

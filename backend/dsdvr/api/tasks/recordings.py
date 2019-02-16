@@ -17,7 +17,7 @@ import daemon
 from django.utils import timezone
 from django.db.transaction import atomic
 
-from api.models import Recording, Library, Media
+from api.models import Recording, Media
 from api.tasks import BaseTask, metadata
 
 
@@ -71,13 +71,8 @@ class RecordingControl(object):
         # TODO: Setup wizard or similar must make user configure a library for
         # recordings... Perhaps we use a sane default? Can't think of one...
         # In any case, the first Library may not be the right one.
-        library = Library.objects.order_by('created').first()
-
-        if library is None:
-            raise RuntimeError('No library for recordings')
-
         media, _ = Media.objects.get_or_create_from_program(
-            self.recording.program, library=library)
+            self.recording.program)
 
         command = [
             'ffmpeg', '-loglevel', 'error', '-y', '-i',

@@ -11,7 +11,6 @@ from api.views.guide import GuideViewSet
 from api.views.guide import GuideUploadViewSet
 from api.views.streams import StreamViewSet
 from api.views.streams import playlist, segment
-from api.views.libraries import LibraryViewSet
 from api.views.shows import ShowViewSet
 from api.views.channels import ChannelViewSet
 from api.views.devices import DeviceViewSet
@@ -30,7 +29,6 @@ router.register('tuners', TunerViewSet, base_name='tuners')
 router.register('recordings', RecordingViewSet, base_name='recordings')
 router.register('guide', GuideViewSet, base_name='guide')
 router.register('streams', StreamViewSet, base_name='streams')
-router.register('libraries', LibraryViewSet, base_name='libraries')
 router.register('shows', ShowViewSet, base_name='shows')
 router.register('movies', MovieViewSet, base_name='movies')
 router.register('channels', ChannelViewSet, base_name='channels')
@@ -49,7 +47,8 @@ urlpatterns = [
          name='streams-playlist'),
     # NOTE: slug is import here. It prevents path traversal chars, yet allows
     # the chars we expect to see as segment file names.
-    path('streams/<uuid:pk>/hls/<slug:name>.ts', segment, name='streams-segment'),
+    path('streams/<uuid:pk>/hls/<slug:name>.ts', segment,
+         name='streams-segment'),
 
     # Standalone viewset that allows file upload and starts the import task.
     path('guide/upload/', GuideUploadViewSet.as_view({'post': 'create'})),

@@ -24,13 +24,14 @@ from rest_framework import status
 
 from api.models import Stream
 from api.serializers import StreamSerializer
+from main import settings
 
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(logging.NullHandler())
 
-WRITER_PROCESS_NAMES = ['ffmpeg']
+WRITER_PROCESS_NAMES = ('ffmpeg',)
 
 
 def find_free_port(interface='localhost'):
@@ -229,7 +230,8 @@ class CreatingStreamSerializer(StreamSerializer):
     def create(self, validated_data):
         obj = super().create(validated_data)
 
-        temp = tempfile.mkdtemp(prefix='.stream-%s-' % obj.id)
+        temp = tempfile.mkdtemp(
+            prefix='.stream-%s-' % obj.id, dir=settings.STORAGE_TEMP)
         playlist = pathjoin(temp, 'stream.m3u8')
 
         # TODO: we need to detect the existing format and decide whether to

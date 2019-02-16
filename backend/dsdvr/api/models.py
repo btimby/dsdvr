@@ -16,6 +16,8 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.functional import cached_property
 
+from main import settings
+
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
@@ -59,11 +61,10 @@ class BasePathField(models.CharField):
     def pre_save(self, model_instance, add):
         path = getattr(model_instance, self.attname)
         abs_path = self.absolute(model_instance)
-        base_path = self.basepath(model_instance)
 
         # Ensure the path is relative.
-        if base_path is not None and path.startswith(base_path):
-            path = relpath(path, base_path)
+        if self.relative_to is not None and path.startswith(self.relative_to):
+            path = relpath(path, self.relative_to)
 
         if not self.null:
             if self.auto_create:
@@ -74,17 +75,11 @@ class BasePathField(models.CharField):
 
         return path
 
-    def basepath(self, model_instance):
-        if self.relative_to is not None:
-            objname, _, attname = self.relative_to.partition('.')
-            return getattr(getattr(model_instance, objname), attname)
-
     def absolute(self, model_instance):
         path = getattr(model_instance, self.attname)
 
         if self.relative_to is not None:
-            base = self.basepath(model_instance)
-            path = pathjoin(base, path)
+            path = pathjoin(self.relative_to, path)
 
         return path
 
@@ -95,6 +90,7 @@ class DirectoryPathField(BasePathField):
             raise ValueError('Path: %s is not a directory')
 
     def _create_path(self, path):
+        LOGGER.debug('Creating: %s', path)
         os.makedirs(path, exist_ok=True)
 
 
@@ -117,9 +113,12 @@ class FilePathField(BasePathField):
         if self.auto_create_parent or self.auto_create:
             parent = dirname(path)
             if parent:
+                LOGGER.debug('Creating: %s', parent)
                 os.makedirs(parent, exist_ok=True)
 
-        pathlib.Path(path).touch(exist_ok=True)
+        if self.auto_create:
+            LOGGER.debug('Creating: %s', path)
+            pathlib.Path(path).touch(exist_ok=True)
 
     def pre_save(self, model_instance, add):
         path = super().pre_save(model_instance, add)
@@ -228,27 +227,6 @@ class Channel(UpdateMixin, CreatedModifiedModel):
         return 'Channel: %s' % str(self)
 
 
-class Library(UpdateMixin, CreatedModifiedModel):
-    TYPE_MOVIES = 0
-    TYPE_SHOWS = 1
-    TYPE_MUSIC = 2
-
-    TYPE_NAMES = {
-        TYPE_MOVIES: 'movies',
-        TYPE_SHOWS: 'shows',
-        TYPE_MUSIC: 'music',
-    }
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
-    name = models.CharField(max_length=32, unique=True)
-    path = DirectoryPathField(unique=True, must_exist=True, auto_create=True)
-
-    @property
-    def abs_path(self):
-        return self.path
-
-
 class Person(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=16)
@@ -286,8 +264,8 @@ class MediaManager(DefaultTypeManager):
             'rating': program.rating,
         })
 
-        # Generate a path for this program. It will be relative to it's library
-        # root.
+        # Generate a path for this program. It will be relative to the media
+        # path.
         if 'path' not in defaults:
             defaults['path'] = _get_program_filename(program)
 
@@ -334,8 +312,6 @@ class Media(UpdateMixin, CreatedModifiedModel):
     categories = models.ManyToManyField(Category, related_name='media')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
     year = models.SmallIntegerField(null=True)
-    library = models.ForeignKey(
-        Library, on_delete=models.CASCADE, related_name='media')
     actors = models.ManyToManyField(Person, through='MediaActor')
 
     objects = MediaManager()
@@ -464,7 +440,7 @@ class Show(Media):
     play_count = models.IntegerField(default=0)
     path = FilePathField(
         max_length=256, must_exist=False, auto_create_parent=True,
-        auto_create=False, relative_to='library.path')
+        auto_create=False, relative_to=settings.STORAGE_MEDIA)
 
     def __str__(self):
         return self.program.title
@@ -589,7 +565,7 @@ class Movie(Media):
     play_count = models.IntegerField(default=0)
     path = FilePathField(
         max_length=256, must_exist=False, auto_create_parent=True,
-        auto_create=False, relative_to='library.path')
+        auto_create=False, relative_to=settings.STORAGE_MEDIA)
 
     objects = MovieManager()
 
