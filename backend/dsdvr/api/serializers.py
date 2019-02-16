@@ -13,7 +13,7 @@ from drf_queryfields import QueryFieldsMixin
 
 from api.models import (
     Show, Recording, Program, Channel, Tuner, Device, Rating, Category, Movie,
-    Stream, Media, Series, Person, DeviceCursor
+    Stream, Media, Series, Person, DeviceCursor, User,
 )
 from api.tasks import STATUS_NAMES
 from api.tasks.recordings import TaskRecordingManager
@@ -401,3 +401,10 @@ class SeriesSerializer(serializers.ModelSerializer):
         model = Series
         fields = '__all__'
         read_only_fields = ('id',)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'name')
+        read_only_fields = ('id', 'email')

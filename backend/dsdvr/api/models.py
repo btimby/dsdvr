@@ -204,11 +204,13 @@ class User(AbstractBaseUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     email = models.EmailField(
         verbose_name='email address',
         max_length=255,
         unique=True,
     )
+    name = models.CharField(max_length=255, verbose_name='name')
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
 

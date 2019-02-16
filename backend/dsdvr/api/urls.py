@@ -21,6 +21,7 @@ from api.views.movies import MovieViewSet
 from api.views.programs import ProgramViewSet
 from api.views.media import MediaViewSet, MediaStreamViewSet, poster, frame0
 from api.views.series import SeriesViewSet
+from api.views.me import MeView
 
 
 router = DefaultRouter()
@@ -69,10 +70,12 @@ urlpatterns = [
 
     # Authentication
     path(
-        'api/token/', simplejwt.TokenObtainPairView.as_view(),
+        'token/', simplejwt.TokenObtainPairView.as_view(),
         name='token_obtain_pair'),
     path(
-        'api/token/refresh/', simplejwt.TokenRefreshView.as_view(),
+        'token/refresh/', simplejwt.TokenRefreshView.as_view(),
         name='token_refresh'),
+
+    path('me/', MeView.as_view(), name='me'),
 
 ] + router.urls

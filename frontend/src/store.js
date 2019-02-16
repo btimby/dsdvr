@@ -1,13 +1,40 @@
 import axios from "axios";
 
+let refreshInProgress = false;
+
+axios.interceptors.request.use (
+    config => {
+      const token = localStorage.getItem('accessToken');
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+      return config;
+    },
+    error => {
+        const { config, response: { status } } = error;
+
+        if (status === 401 && !refreshInProgress) {
+            let refreshToken = localStorage.getItem('refreshToken');
+
+            refreshInProgress = true;
+
+            axios.post('/api/token/refresh/', {
+                'refresh': refreshToken,
+            })
+                .then(r => {
+                    localStorage.setItem('accessToken', r.data.access);
+
+                    refreshInProgress = false;
+                });
+        } else {
+            return Promise.reject (error);
+        }
+    }
+);
+
 class Store {
     constructor() {
         this.state = { 
             nowPlaying: null,
-            user: {
-                name: 'Ben Timby',
-                email: 'btimby@gmail.com',
-            },
+            user: null,
         };
     }
 
@@ -78,6 +105,24 @@ class Store {
             console.log(e);
             throw e;
         });
+    }
+
+    login(email, password) {
+        return axios.post('/api/token/', { email: email, password: password })
+            .then(r => {
+                localStorage.setItem('accessToken', r.data.access);
+                localStorage.setItem('refreshToken', r.data.refresh);
+
+                axios.get('/api/me/')
+                    .then(r => {
+                        this.state.user = r.data;
+                    });
+            })
+    }
+
+    logout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
     }
 }
 
