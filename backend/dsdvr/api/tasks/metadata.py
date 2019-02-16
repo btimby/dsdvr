@@ -124,7 +124,7 @@ def omdb(media):
             MediaActor.objects.get_or_create(media=media, person=person)
         series.categories.add(*categories)
         for person in actors:
-            MediaActor.objects.get_or_create(media=series.media, person=person)
+            MediaActor.objects.get_or_create(media=series, person=person)
 
     else:
         media.update(**metadata)
