@@ -13,7 +13,7 @@ from drf_queryfields import QueryFieldsMixin
 
 from api.models import (
     Episode, Show, Recording, Program, Channel, Library, Tuner, Device, Actor,
-    Rating, Category, Movie, Music, Stream, Media,
+    Rating, Category, Movie, Music, Stream, Media, Artist, Album, Series,
 )
 from api.tasks import STATUS_NAMES
 from api.tasks.recordings import RecordingControl
@@ -86,6 +86,10 @@ class ShowSerializer(serializers.ModelSerializer):
     category = serializers.SlugRelatedField(read_only=True, slug_field='name')
     type = DisplayChoiceField(
         choices=list(Show.TYPE_NAMES.items()), read_only=True)
+    path = serializers.SerializerMethodField()
+
+    def get_path(self, obj):
+        return obj.abs_path
 
 
 class MovieSerializer(serializers.ModelSerializer):
@@ -99,6 +103,10 @@ class MovieSerializer(serializers.ModelSerializer):
     category = serializers.SlugRelatedField(read_only=True, slug_field='name')
     type = DisplayChoiceField(
         choices=list(Show.TYPE_NAMES.items()), read_only=True)
+    path = serializers.SerializerMethodField()
+
+    def get_path(self, obj):
+        return obj.abs_path
 
 
 class MusicSerializer(serializers.ModelSerializer):
@@ -112,6 +120,10 @@ class MusicSerializer(serializers.ModelSerializer):
     category = serializers.SlugRelatedField(read_only=True, slug_field='name')
     type = DisplayChoiceField(
         choices=list(Show.TYPE_NAMES.items()), read_only=True)
+    path = serializers.SerializerMethodField()
+
+    def get_path(self, obj):
+        return obj.abs_path
 
 
 class RecordingSerializer(serializers.ModelSerializer):
@@ -261,13 +273,19 @@ class MediaSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'path')
 
     serializer_classes = {
-        Media.TYPE_SHOW: ShowSerializer,
-        Media.TYPE_MOVIE: MovieSerializer,
-        Media.TYPE_MUSIC: MusicSerializer,
+        Media.TYPE_SHOW: ('show', ShowSerializer),
+        Media.TYPE_MOVIE: ('movie', MovieSerializer),
+        Media.TYPE_MUSIC: ('music', MusicSerializer),
     }
 
+    path = serializers.SerializerMethodField()
+
+    def get_path(self, obj):
+        return obj.abs_path
+
     def to_representation(self, data):
-        return self.serializer_classes[data.type](data).data
+        attrname, serializer_class = self.serializer_classes[data.type]
+        return serializer_class(getattr(data, attrname)).data
 
 
 class LibrarySerializer(QueryFieldsMixin, serializers.ModelSerializer):
@@ -350,3 +368,24 @@ class StreamSerializer(serializers.ModelSerializer):
             pass
 
         return url
+
+
+class ArtistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Artist
+        fields = '__all__'
+        read_only_fields = ('id',)
+
+
+class AlbumSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Album
+        fields = '__all__'
+        read_only_fields = ('id',)
+
+
+class SeriesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Series
+        fields = '__all__'
+        read_only_fields = ('id',)

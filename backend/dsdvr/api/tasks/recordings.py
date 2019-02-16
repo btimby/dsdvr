@@ -34,14 +34,13 @@ class RecordingControl(object):
         # TODO: Setup wizard or similar must make user configure a library for
         # recordings... Perhaps we use a sane default? Can't think of one...
         # In any case, the first Library may not be the right one.
-        library = Library.objects.first()
+        library = Library.objects.order_by('created').first()
 
         if library is None:
             raise RuntimeError('No library for recordings')
 
         show, _ = Show.objects.get_or_create_from_program(
             self.recording.program, library=library)
-        import pdb; pdb.set_trace()
         recording_path = util.get_next_recording(show.abs_path)
 
         command = [

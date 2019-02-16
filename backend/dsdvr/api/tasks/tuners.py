@@ -33,7 +33,7 @@ class TunerScanException(Exception):
     pass
 
 
-class TunerDiscoverTask(BaseTask):
+class TaskTunerDiscover(BaseTask):
     def _discover(self):
         # Create an array of structs.
         discovered = (hdhomerun_discover_device_t * TUNERS_MAX)()
@@ -151,6 +151,6 @@ class TunerDiscoverTask(BaseTask):
         self._set_progress(done, total, 'Discovered %i Tuners.' % done)
 
 
-class TunerScanTask(BaseTask):
+class TaskTunerScan(BaseTask):
     def _run(self, tuner):
         self._set_progress(1, 1, 'Scan complete.')

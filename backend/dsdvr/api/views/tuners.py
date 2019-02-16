@@ -8,7 +8,7 @@ from rest_framework.decorators import action
 
 from api.models import Tuner
 from api.serializers import TunerSerializer
-from api.tasks.tuners import TunerDiscoverTask, TunerScanTask
+from api.tasks.tuners import TaskTunerDiscover, TaskTunerScan
 
 
 LOGGER = logging.getLogger(__name__)
@@ -22,10 +22,10 @@ class TunerViewSet(viewsets.ModelViewSet):
 
     @action(methods=['post'], detail=False)
     def discover(self, request):
-        return TunerDiscoverTask().start()
+        return TaskTunerDiscover().start()
 
 
 class TunerScanView(views.APIView):
     def post(self, request, pk=None):
         tuner = get_object_or_404(Tuner, pk=pk)
-        return TunerScanTask(args=(tuner,)).start()
+        return TaskTunerScan(args=(tuner,)).start()

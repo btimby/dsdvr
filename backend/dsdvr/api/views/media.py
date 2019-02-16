@@ -11,6 +11,7 @@ import ffmpeg
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.db.models import F
+from django.contrib.staticfiles.templatetags.staticfiles import static
 
 from rest_framework import serializers, viewsets, views
 from rest_framework.response import Response
@@ -27,9 +28,10 @@ LOGGER.addHandler(logging.NullHandler())
 
 
 def make_frame0(media_path, frame0_path):
+    # TODO: No way to specify -y before input...
     ffmpeg \
         .input(media_path) \
-        .output(frame0_path, '-y', vframes=1, f='image2') \
+        .output(frame0_path, vframes=1, f='image2') \
         .run()
 
 
@@ -75,7 +77,7 @@ def poster(request, pk):
     # it alone may allow the player to rewind etc. The playlist controls the
     # options available to the user.
     media = get_object_or_404(Media, pk=pk)
-    poster_url = media.poster if media.poster else '/static/images/poster.jpg'
+    poster_url = media.poster if media.poster else static('images/poster.jpg')
     return redirect(poster_url)
 
 
@@ -84,14 +86,13 @@ def frame0(request, pk):
     # it alone may allow the player to rewind etc. The playlist controls the
     # options available to the user.
     media = get_object_or_404(Media, pk=pk)
-    media_path = pathjoin(media.path, 'recording0.mpeg')
-    frame0_path = pathjoin(media.path, 'frame0.jpg')
+    frame0_path = pathjoin(dirname(media.abs_path), '%s.jpg' % pk)
 
-    if not isfile(media_path):
+    if not isfile(media.abs_path):
         raise Http404()
 
     if not isfile(frame0_path):
-        make_frame0(media_path, frame0_path)
+        make_frame0(media.abs_path, frame0_path)
 
     try:
         frame0_file = open(frame0_path, 'rb')

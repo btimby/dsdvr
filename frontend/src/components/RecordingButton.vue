@@ -51,7 +51,16 @@
     },
 
     mounted() {
-        this.local.recordingIterval = setInterval(() => {
+        this.getRecordings();
+        this.local.recordingIterval = setInterval(this.getRecordings, 10000);
+    },
+
+    beforeDestroy() {
+        clearInterval(this.local.recordingIterval);
+    },
+
+    methods: {
+        getRecordings() {
             // Don't fetch ajax data if a video is playing...
             if (this.store.nowPlaying)
                 return;
@@ -59,12 +68,8 @@
             this.$store.getRecordings()
                 .then(r => {
                     this.local.recordings = r.data;
-                })
-        }, 10000);
-    },
-
-    beforeDestroy() {
-        clearInterval(this.local.recordingIterval);
+                });
+        }
     },
 
     computed: {

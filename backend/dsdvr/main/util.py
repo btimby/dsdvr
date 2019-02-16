@@ -12,6 +12,10 @@ def get_recordings(path):
     directory or the directory containing the given file. This function is able
     to skip gaps in the numbering of files.
     '''
+    # Special filename invokes special handling...
+    if basename(path) != 'recording0.mpeg':
+        return [path]
+
     path = dirname(path)
     file_names = glob.glob(pathjoin(path, 'recording*.mpeg'))
     numbers, nummap = [], {}
@@ -49,8 +53,8 @@ def get_next_recording(path):
     Get the name for the next recording file in the sequence. Path can be a
     file or directory. Assumes files named "recording*.mpeg".
     '''
-    path = dirname(path)
     file_names = get_recordings(path)
+    path = dirname(path)
 
     if file_names:
         # Increment the number from the last file.

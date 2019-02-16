@@ -118,9 +118,19 @@ class FilePathField(BasePathField):
 
     def _create_path(self, path):
         if self.auto_create_parent or self.auto_create:
-            os.makedirs(dirname(path), exist_ok=True)
+            parent = dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
 
         pathlib.Path(path).touch(exist_ok=True)
+
+    def pre_save(self, model_instance, add):
+        path = super().pre_save(model_instance, add)
+
+        if self.auto_create_parent:
+            self._create_path(path)
+
+        return path
 
 
 class UpdateMixin(object):
@@ -258,6 +268,10 @@ class Library(UpdateMixin, CreatedModifiedModel):
     name = models.CharField(max_length=32, unique=True)
     path = DirectoryPathField(unique=True, must_exist=True, auto_create=True)
 
+    @property
+    def abs_path(self):
+        return self.path
+
 
 class Series(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
@@ -375,6 +389,7 @@ class Media(UpdateMixin, CreatedModifiedModel):
     format = models.CharField(null=True, max_length=32)
     audio_enc = models.CharField(null=True, max_length=32)
     play_count = models.IntegerField(default=0)
+    year = models.SmallIntegerField(null=True)
 
     @cached_property
     def abs_path(self):
@@ -408,6 +423,7 @@ class ShowManager(DefaultTypeManager):
 
         show, created = self.get_or_create(program=program, defaults=defaults)
         show.update(**defaults)
+        show.actors.add(program.actors.all())
         return show, created
 
 
@@ -419,6 +435,7 @@ class Show(Media):
     width = models.SmallIntegerField(null=True)
     height = models.SmallIntegerField(null=True)
     video_enc = models.CharField(null=True, max_length=32)
+    actors = models.ManyToManyField(Actor)
 
     def __str__(self):
         return self.program.title
@@ -514,12 +531,17 @@ class Artist(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256)
     poster = models.URLField(max_length=256, null=True)
+    desc = models.TextField(null=True)
 
 
 class Album(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=256)
+    artist = models.ForeignKey(
+        Artist, null=True, on_delete=models.CASCADE, related_name='albums')
+    title = models.CharField(max_length=256)
     poster = models.URLField(max_length=256, null=True)
+    year = models.SmallIntegerField()
+    desc = models.TextField(null=True)
 
 
 class MusicManager(DefaultTypeManager):
@@ -531,6 +553,7 @@ class Music(Media):
         Artist, on_delete=models.CASCADE, related_name='songs')
     album = models.ForeignKey(
         Album, on_delete=models.CASCADE, related_name='songs')
+    track = models.SmallIntegerField(null=True)
 
     objects = MusicManager()
 
@@ -543,5 +566,6 @@ class Movie(Media):
     width = models.SmallIntegerField(null=True)
     height = models.SmallIntegerField(null=True)
     video_enc = models.CharField(null=True, max_length=32)
+    actors = models.ManyToManyField(Actor)
 
     objects = MovieManager()

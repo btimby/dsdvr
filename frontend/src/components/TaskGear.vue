@@ -58,7 +58,16 @@
     },
 
     mounted() {
-        this.local.taskInterval = setInterval(() => {
+        this.getTasks();
+        this.local.taskInterval = setInterval(this.getTasks, 10000);
+    },
+
+    beforeDestroy() {
+        clearInterval(this.local.taskInterval);
+    },
+
+    methods: {
+        getTasks() {
             // Don't fetch ajax data if a video is playing...
             if (this.store.nowPlaying)
                 return;
@@ -66,12 +75,8 @@
             this.$store.getTasks()
                 .then(r => {
                     this.local.tasks = r.data;
-                })
-        }, 10000);
-    },
-
-    beforeDestroy() {
-        clearInterval(this.local.taskInterval);
+                });
+        }
     },
 
     computed: {

@@ -189,9 +189,6 @@ def _tail_to_ffmpeg(paths, command):
     '''
     Spawn a command and send a number of files to it's stdin.
     '''
-    LOGGER.info(
-        'Piping %i files to: "%s"', len(paths), " ".join(command))
-
     pid_file = Pidfile(pathjoin(dirname(paths[0]), 'ffmpeg.pid'))
 
     # daemon kills the host process, so start an intermediary...
@@ -244,7 +241,7 @@ class CreatingStreamSerializer(StreamSerializer):
 
         temp = tempfile.mkdtemp(prefix='.stream-%s-' % obj.id)
         playlist = pathjoin(temp, 'stream.m3u8')
-        file_names = util.get_recordings(obj.media.path)
+        file_names = util.get_recordings(obj.media.abs_path)
 
         # TODO: we need to detect the existing format and decide whether to
         # transcode or copy.
@@ -253,6 +250,9 @@ class CreatingStreamSerializer(StreamSerializer):
             '-c:a', 'copy', '-flags', '+cgop', '-g', '30', '-hls_list_size',
             '0', '-hls_time', '3', playlist,
         ]
+
+        LOGGER.info(
+            'Piping %s to: "%s"', ','.join(file_names), " ".join(command))
 
         # The video file could be written to, use tail to follow the file.
         pid = _tail_to_ffmpeg(file_names, command)
