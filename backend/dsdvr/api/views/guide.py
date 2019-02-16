@@ -12,7 +12,7 @@ from rest_framework import serializers
 from rest_framework.parsers import MultiPartParser
 from rest_framework.decorators import action
 
-from api.models import Channel, Episode, Category, Rating, Program
+from api.models import Channel
 from api.serializers import GuideSerializer, GuideUploadSerializer
 from api.tasks.guide import TaskGuideImport
 

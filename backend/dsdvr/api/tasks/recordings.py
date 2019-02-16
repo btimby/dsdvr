@@ -2,7 +2,6 @@ import logging
 import threading
 import subprocess
 import signal
-import time
 
 from datetime import timedelta
 
@@ -15,7 +14,7 @@ from django.utils import timezone
 from django.db.transaction import atomic
 
 from api.models import Recording, Library, Show
-from api.tasks import BaseTask
+from api.tasks import BaseTask, metadata
 
 from main import util
 
@@ -78,6 +77,12 @@ class RecordingControl(object):
                 'ffmpeg died with error %i: %s', r,
                 util.last_3_lines(process.stderr))
 
+        try:
+            metadata.omdb(show)
+
+        except Exception as e:
+            LOGGER.exception(e)
+
         return process
 
     def _get_process(self):
@@ -116,9 +121,12 @@ class RecordingControl(object):
         mpegts as a container.
         '''
         # TODO: Here is where we would skip commercials etc.
-        path = self.recording.show.path
-        file_names = util.get_recordings(path)
-        util.combine_recordings(file_names[0], file_names[1:])
+        util.combine_recordings(self.recording.show.path)
+        try:
+            metadata.ffprobe(self.recording.show)
+
+        except Exception as e:
+            LOGGER.exception(e)
 
     def _stop_recording(self, process=None):
         process = self._get_process()
@@ -128,7 +136,7 @@ class RecordingControl(object):
             try:
                 process.wait(timeout=10)
 
-            except subprocess.TimeoutException as e:
+            except subprocess.TimeoutExpired as e:
                 # Process did not die after 10s, move forward, next task
                 # iteration will retry.
                 LOGGER.exception(e)

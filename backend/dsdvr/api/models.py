@@ -4,11 +4,9 @@ import uuid
 import signal
 import logging
 import pathlib
-import random
-import string
 
 from os.path import join as pathjoin
-from os.path import isdir, isfile, exists, relpath, dirname
+from os.path import isdir, isfile, relpath, dirname
 from datetime import timedelta
 
 from django.db import models
@@ -16,24 +14,12 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.functional import cached_property
 
-from ua_parser import user_agent_parser
+from main import util
 
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(logging.NullHandler())
-
-
-def flatten(d):
-    flat = {}
-    for key, value in d.items():
-        if hasattr(value, 'items'):
-            for subkey, value in flatten(value).items():
-                flat['%s_%s' % (key, subkey)] = value
-        
-        else:
-            flat[key] = value
-    return flat
 
 
 class BasePathField(models.CharField):
@@ -183,26 +169,6 @@ class Setting(UpdateMixin, CreatedModifiedModel):
     value = models.CharField(max_length=256)
 
 
-class DeviceQuerySet(models.query.QuerySet):
-    def get_or_create(self, *args, **kwargs):
-        user_agent = kwargs.get('user_agent', None)
-
-        if user_agent:
-            # TODO: populate other fields from user_agent
-            defaults = kwargs.setdefault('defaults', {})
-            flat = flatten(user_agent_parser.Parse(user_agent))
-            flat.pop('string', None)
-            defaults.update(flat)
-
-        return super().get_or_create(*args, **kwargs)
-
-
-class DeviceManager(models.Manager):
-    def get_queryset(self):
-        return DeviceQuerySet(
-            model=self.model, using=self._db, hints=self._hints)
-
-
 class Device(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     user_agent = models.TextField(unique=True)
@@ -219,8 +185,6 @@ class Device(UpdateMixin, CreatedModifiedModel):
     user_agent_major = models.CharField(max_length=32, null=True)
     user_agent_minor = models.CharField(max_length=32, null=True)
     user_agent_patch = models.CharField(max_length=32, null=True)
-
-    objects = DeviceManager()
 
 
 class Tuner(UpdateMixin, CreatedModifiedModel):
@@ -274,23 +238,9 @@ class Library(UpdateMixin, CreatedModifiedModel):
         return self.path
 
 
-class Series(UpdateMixin, CreatedModifiedModel):
+class Actor(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=128, unique=True)
-
-
-class Episode(UpdateMixin, CreatedModifiedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    series = models.ForeignKey(
-        Series, on_delete=models.CASCADE, related_name='episodes')
-    season = models.IntegerField()
-    episode_system = models.CharField(max_length=32)
-    episode = models.CharField(max_length=32)
-
-
-class Category(UpdateMixin, CreatedModifiedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=128)
+    name = models.CharField(max_length=16)
 
 
 class Rating(UpdateMixin, CreatedModifiedModel):
@@ -298,9 +248,75 @@ class Rating(UpdateMixin, CreatedModifiedModel):
     name = models.CharField(max_length=16)
 
 
-class Actor(UpdateMixin, CreatedModifiedModel):
+class Category(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=16)
+    name = models.CharField(max_length=128)
+
+
+class Media(UpdateMixin, CreatedModifiedModel):
+    TYPE_MOVIE = 0
+    TYPE_SERIES = 1
+    TYPE_SHOW = 2
+
+    TYPE_NAMES = {
+        TYPE_MOVIE: 'Movie',
+        TYPE_SERIES: 'Series',
+        TYPE_SHOW: 'Show',
+    }
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
+    title = models.CharField(max_length=256)
+    subtitle = models.CharField(max_length=256)
+    desc = models.TextField()
+    poster = models.URLField(max_length=256, null=True)
+    categories = models.ManyToManyField(Category, related_name='media')
+    rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
+    year = models.SmallIntegerField(null=True)
+    library = models.ForeignKey(
+        Library, on_delete=models.CASCADE, related_name='media')
+
+    def type_model(self):
+        if self.type == Media.TYPE_MOVIE:
+            return Movie
+
+        elif self.type == Media.TYPE_SHOW:
+            return Show
+
+        elif self.type == Media.TYPE_SERIES:
+            return Series
+
+        else:
+            raise ValueError(
+                'Unsupported media type %s', Media.TYPE_NAMES[self.type])
+
+    def type_instance(self):
+        if self.type == Media.TYPE_MOVIE:
+            return self.movie
+
+        elif self.type == Media.TYPE_SHOW:
+            return self.show
+
+        elif self.type == Media.TYPE_SERIES:
+            return self.series
+
+        else:
+            raise ValueError(
+                'Unsupported media type %s', Media.TYPE_NAMES[self.type])
+
+    @property
+    def abs_path(self):
+        return self.type_instance().abs_path
+
+
+class SeriesManager(DefaultTypeManager):
+    DEFAULT_TYPE = Media.TYPE_SERIES
+
+
+class Series(Media):
+    actors = models.ManyToManyField(Actor)
+
+    objects = SeriesManager()
 
 
 class ProgramManager(models.Manager):
@@ -334,8 +350,8 @@ class Program(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     channel = models.ForeignKey(
         Channel, on_delete=models.CASCADE, related_name='programs')
-    episode = models.ForeignKey(
-        Episode, on_delete=models.CASCADE, null=True, related_name='programs')
+    season = models.PositiveSmallIntegerField(null=True)
+    episode = models.PositiveSmallIntegerField(null=True)
     categories = models.ManyToManyField(Category, related_name='programs')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
     actors = models.ManyToManyField(Actor)
@@ -357,41 +373,6 @@ class Program(UpdateMixin, CreatedModifiedModel):
     objects = ProgramManager()
 
 
-class Media(UpdateMixin, CreatedModifiedModel):
-    TYPE_MOVIE = 0
-    TYPE_SHOW = 2
-
-    TYPE_NAMES = {
-        TYPE_MOVIE: 'Movie',
-        TYPE_SHOW: 'Show',
-    }
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
-    library = models.ForeignKey(
-        Library, on_delete=models.CASCADE, related_name='media')
-    path = FilePathField(
-        max_length=256, must_exist=False, auto_create_parent=True,
-        auto_create=False, relative_to='library.path')
-    title = models.CharField(max_length=256)
-    subtitle = models.CharField(max_length=256)
-    desc = models.TextField()
-    poster = models.URLField(max_length=256, null=True)
-    categories = models.ManyToManyField(Category, related_name='media')
-    rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
-    has_metadata = models.BooleanField(default=False)
-    duration = models.DecimalField(null=True, max_digits=12, decimal_places=6)
-    size = models.IntegerField(null=True)
-    format = models.CharField(null=True, max_length=32)
-    audio_enc = models.CharField(null=True, max_length=32)
-    play_count = models.IntegerField(default=0)
-    year = models.SmallIntegerField(null=True)
-
-    @cached_property
-    def abs_path(self):
-        return self._meta.get_field('path').absolute(self)
-
-
 class ShowManager(DefaultTypeManager):
     DEFAULT_TYPE = Media.TYPE_SHOW
 
@@ -409,12 +390,7 @@ class ShowManager(DefaultTypeManager):
         # Generate a path for this program. It will be relative to it's library
         # root.
         if 'path' not in defaults:
-            title = program.title.replace(' ', '.')
-            airtime = program.start.strftime('%m-%d-%Y-%H:%M')
-            # unique = ''.join(
-            #     random.choices(string.ascii_letters + string.digits, k=6))
-            defaults['path'] = pathjoin(
-                title, airtime, 'recording0.mpeg')
+            defaults['path'] = util.get_program_filename(program)
 
         show, created = self.get_or_create(program=program, defaults=defaults)
         show.update(**defaults)
@@ -423,21 +399,39 @@ class ShowManager(DefaultTypeManager):
         return show, created
 
 
+class Episode(models.Model):
+    series = models.ForeignKey(Series, on_delete=models.CASCADE)
+    show = models.ForeignKey('Show', on_delete=models.CASCADE, unique=True)
+    season = models.PositiveSmallIntegerField(null=True)
+    episode = models.PositiveSmallIntegerField(null=True)
+
+
 class Show(Media):
     program = models.OneToOneField(
         Program, on_delete=models.SET_NULL, null=True, related_name='shows')
-    episode = models.ForeignKey(
-        Episode, on_delete=models.CASCADE, null=True, related_name='shows')
+    series = models.ManyToManyField(Series, through=Episode)
     width = models.SmallIntegerField(null=True)
     height = models.SmallIntegerField(null=True)
     video_enc = models.CharField(null=True, max_length=32)
     actors = models.ManyToManyField(Actor)
+    size = models.IntegerField(null=True)
+    audio_enc = models.CharField(null=True, max_length=32)
+    duration = models.DecimalField(null=True, max_digits=12, decimal_places=6)
+    format = models.CharField(null=True, max_length=32)
+    play_count = models.IntegerField(default=0)
+    path = FilePathField(
+        max_length=256, must_exist=False, auto_create_parent=True,
+        auto_create=False, relative_to='library.path')
 
     def __str__(self):
         return self.program.title
 
     def __repr__(self):
         return 'Show: %s' % str(self)
+
+    @cached_property
+    def abs_path(self):
+        return self._meta.get_field('path').absolute(self)
 
     objects = ShowManager()
 
@@ -532,5 +526,18 @@ class Movie(Media):
     height = models.SmallIntegerField(null=True)
     video_enc = models.CharField(null=True, max_length=32)
     actors = models.ManyToManyField(Actor)
+    actors = models.ManyToManyField(Actor)
+    size = models.IntegerField(null=True)
+    audio_enc = models.CharField(null=True, max_length=32)
+    duration = models.DecimalField(null=True, max_digits=12, decimal_places=6)
+    format = models.CharField(null=True, max_length=32)
+    play_count = models.IntegerField(default=0)
+    path = FilePathField(
+        max_length=256, must_exist=False, auto_create_parent=True,
+        auto_create=False, relative_to='library.path')
 
     objects = MovieManager()
+
+    @cached_property
+    def abs_path(self):
+        return self._meta.get_field('path').absolute(self)

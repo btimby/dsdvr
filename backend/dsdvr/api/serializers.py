@@ -12,11 +12,11 @@ from rest_framework import serializers
 from drf_queryfields import QueryFieldsMixin
 
 from api.models import (
-    Episode, Show, Recording, Program, Channel, Library, Tuner, Device, Actor,
+    Show, Recording, Program, Channel, Library, Tuner, Device, Actor,
     Rating, Category, Movie, Stream, Media, Series,
 )
 from api.tasks import STATUS_NAMES
-from api.tasks.recordings import RecordingControl
+from api.tasks.recordings import TaskRecordingManager
 
 
 LOGGER = logging.getLogger(__name__)
@@ -36,24 +36,17 @@ class DisplayChoiceField(serializers.ChoiceField):
         return self._choices[obj]
 
 
-class EpisodeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Episode
-        fields = '__all__'
-
-
 class ProgramRelatedField(serializers.ModelSerializer):
     class Meta:
         model = Program
         fields = ('id', 'title', 'start', 'stop', 'duration', 'poster',
-                  'previously_shown', 'channel', 'episode', 'category',
-                  'rating')
+                  'previously_shown', 'channel', 'season', 'episode',
+                  'category', 'rating')
         read_only_fields = ('title', 'start', 'stop', 'duration', 'poster',
-                            'previously_shown', 'channel', 'episode',
+                            'previously_shown', 'channel', 'season', 'episode',
                             'category', 'rating')
 
     channel = serializers.StringRelatedField(read_only=True)
-    episode = serializers.StringRelatedField(read_only=True)
     category = serializers.SlugRelatedField(
         read_only=True, slug_field='name')
     rating = serializers.SlugRelatedField(
@@ -192,7 +185,7 @@ class RecordingSerializer(serializers.ModelSerializer):
         recording = super().create(validated_data)
 
         # Start this task to potentially start a recording right away.
-        RecordingControl(recording).control()
+        TaskRecordingManager().start()
 
         return recording
 
@@ -204,7 +197,6 @@ class ProgramSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', )
 
     recording = serializers.PrimaryKeyRelatedField(read_only=True)
-    episode = EpisodeSerializer()
     rating = serializers.SlugRelatedField(read_only=True, slug_field='name')
     category = serializers.SlugRelatedField(read_only=True, slug_field='name')
 

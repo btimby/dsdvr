@@ -6,16 +6,13 @@ from os.path import isfile
 from os.path import dirname
 from os.path import join as pathjoin
 
-import ffmpeg
-
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.db.models import F
 from django.contrib.staticfiles.templatetags.staticfiles import static
 
-from rest_framework import serializers, viewsets, views
+from rest_framework import viewsets
 from rest_framework.response import Response
-from rest_framework import status
 
 from main import util
 
@@ -77,7 +74,7 @@ class MediaStreamViewSet(viewsets.ModelViewSet):
             if serializer.is_valid():
                 serializer.save()
 
-        Media.objects.filter(pk=media.id) \
+        media.type_model().objects.filter(pk=media.id) \
             .update(play_count=F('play_count') + 1)
 
         return Response(serializer.data)
@@ -88,18 +85,17 @@ class MediaStreamViewSet(viewsets.ModelViewSet):
 
 
 def poster(request, pk):
-    # TODO: we may wish to generate or modify this playlist. Although leaving
-    # it alone may allow the player to rewind etc. The playlist controls the
-    # options available to the user.
+    # TODO: we may wish to cache these images. Could use a django disk cache
+    # with a controlled path to use our "scratch" space. Could use a second
+    # small memory cache as well. First cache to avoid hitting upstream too
+    # much and second to avoid disk I/O.
     media = get_object_or_404(Media, pk=pk)
     poster_url = media.poster if media.poster else static('images/poster.jpg')
     return redirect(poster_url)
 
 
 def frame0(request, pk):
-    # TODO: we may wish to generate or modify this playlist. Although leaving
-    # it alone may allow the player to rewind etc. The playlist controls the
-    # options available to the user.
+    # TODO: we may with to cache these images in a memory cache.
     media = get_object_or_404(Media, pk=pk)
     frame0_path = pathjoin(dirname(media.abs_path), '%s.jpg' % pk)
 
