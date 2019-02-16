@@ -61,7 +61,8 @@ class MediaStreamViewSet(viewsets.ModelViewSet):
     def create(self, request, pk=None):
         media = get_object_or_404(Media, pk=pk)
         try:
-            serializer = StreamSerializer(media.stream)
+            serializer = StreamSerializer(
+                media.stream, context={'request': request})
 
         except Stream.DoesNotExist:
 
@@ -69,7 +70,8 @@ class MediaStreamViewSet(viewsets.ModelViewSet):
                 'media': pk,
                 'type': request.data.get('type', 0)
             }
-            serializer = CreatingStreamSerializer(data=data)
+            serializer = CreatingStreamSerializer(
+                data=data, context={'request': request})
 
             if serializer.is_valid():
                 serializer.save()

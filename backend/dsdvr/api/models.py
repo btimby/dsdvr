@@ -238,9 +238,19 @@ class Library(UpdateMixin, CreatedModifiedModel):
         return self.path
 
 
-class Actor(UpdateMixin, CreatedModifiedModel):
+class Person(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=16)
+
+
+class MediaActor(UpdateMixin, CreatedModifiedModel):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE)
+    media = models.ForeignKey('Media', on_delete=models.CASCADE)
+
+
+class ProgramActor(UpdateMixin, CreatedModifiedModel):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE)
+    program = models.ForeignKey('Program', on_delete=models.CASCADE)
 
 
 class Rating(UpdateMixin, CreatedModifiedModel):
@@ -251,6 +261,42 @@ class Rating(UpdateMixin, CreatedModifiedModel):
 class Category(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=128)
+
+
+class MediaManager(DefaultTypeManager):
+    def get_or_create_from_program(self, program, **kwargs):
+        defaults = kwargs.copy()
+        defaults.update({
+            'title': program.title,
+            'subtitle': program.subtitle,
+            'desc': program.desc,
+            'duration': program.duration,
+            'poster': program.poster,
+            'rating': program.rating,
+        })
+
+        # Generate a path for this program. It will be relative to it's library
+        # root.
+        if 'path' not in defaults:
+            defaults['path'] = util.get_program_filename(program)
+
+        is_movie = False
+        for cat in program.categories.all():
+            if cat.name.lower() == 'movie':
+                is_movie = True
+
+        media_class = Movie if is_movie else Show
+
+        media, created = media_class.objects.get_or_create(
+            program=program, defaults=defaults)
+        media.update(**defaults)
+
+        for actor in program.actors.all():
+            MediaActor.objects.get_or_create(
+                media=media, person=actor.person)
+
+        media.categories.add(*program.categories.all())
+        return media, created
 
 
 class Media(UpdateMixin, CreatedModifiedModel):
@@ -275,6 +321,9 @@ class Media(UpdateMixin, CreatedModifiedModel):
     year = models.SmallIntegerField(null=True)
     library = models.ForeignKey(
         Library, on_delete=models.CASCADE, related_name='media')
+    actors = models.ManyToManyField(Person, through='MediaActor')
+
+    objects = MediaManager()
 
     def type_model(self):
         if self.type == Media.TYPE_MOVIE:
@@ -314,8 +363,6 @@ class SeriesManager(DefaultTypeManager):
 
 
 class Series(Media):
-    actors = models.ManyToManyField(Actor)
-
     objects = SeriesManager()
 
 
@@ -354,7 +401,7 @@ class Program(UpdateMixin, CreatedModifiedModel):
     episode = models.PositiveSmallIntegerField(null=True)
     categories = models.ManyToManyField(Category, related_name='programs')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
-    actors = models.ManyToManyField(Actor)
+    actors = models.ManyToManyField(Person, through='ProgramActor')
     title = models.CharField(max_length=256)
     subtitle = models.CharField(max_length=256)
     desc = models.TextField()
@@ -376,28 +423,6 @@ class Program(UpdateMixin, CreatedModifiedModel):
 class ShowManager(DefaultTypeManager):
     DEFAULT_TYPE = Media.TYPE_SHOW
 
-    def get_or_create_from_program(self, program, **kwargs):
-        defaults = kwargs.copy()
-        defaults.update({
-            'title': program.title,
-            'subtitle': program.subtitle,
-            'desc': program.desc,
-            'duration': program.duration,
-            'poster': program.poster,
-            'rating': program.rating,
-        })
-
-        # Generate a path for this program. It will be relative to it's library
-        # root.
-        if 'path' not in defaults:
-            defaults['path'] = util.get_program_filename(program)
-
-        show, created = self.get_or_create(program=program, defaults=defaults)
-        show.update(**defaults)
-        show.actors.add(*program.actors.all())
-        show.categories.add(*program.categories.all())
-        return show, created
-
 
 class Episode(models.Model):
     series = models.ForeignKey(Series, on_delete=models.CASCADE)
@@ -413,7 +438,6 @@ class Show(Media):
     width = models.SmallIntegerField(null=True)
     height = models.SmallIntegerField(null=True)
     video_enc = models.CharField(null=True, max_length=32)
-    actors = models.ManyToManyField(Actor)
     size = models.IntegerField(null=True)
     audio_enc = models.CharField(null=True, max_length=32)
     duration = models.DecimalField(null=True, max_digits=12, decimal_places=6)
@@ -451,7 +475,6 @@ class Stream(UpdateMixin, CreatedModifiedModel):
     type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
     path = DirectoryPathField(null=True)
     pid = models.IntegerField(null=True)
-    cursor = models.DecimalField(max_digits=12, decimal_places=6, default=0.0)
 
     def delete(self, *args, **kwargs):
         if self.pid is not None:
@@ -465,6 +488,19 @@ class Stream(UpdateMixin, CreatedModifiedModel):
             shutil.rmtree(self.path, ignore_errors=True)
 
         return super().delete(*args, **kwargs)
+
+
+class DeviceCursor(UpdateMixin, models.Model):
+    class Meta:
+        unique_together = [
+            ('device', 'cursor'),
+        ]
+
+    device = models.ForeignKey(
+        Device, on_delete=models.CASCADE, related_name='devicecursor')
+    stream = models.ForeignKey(
+        Stream, on_delete=models.CASCADE, related_name='devicecursor')
+    cursor = models.DecimalField(max_digits=12, decimal_places=6, default=0.0)
 
 
 class Recording(UpdateMixin, CreatedModifiedModel):
@@ -485,8 +521,8 @@ class Recording(UpdateMixin, CreatedModifiedModel):
     stop = models.DateTimeField()
     program = models.OneToOneField(
         Program, on_delete=models.CASCADE, related_name='recording')
-    show = models.OneToOneField(
-        Show, null=True, on_delete=models.CASCADE, related_name='recording')
+    media = models.OneToOneField(
+        Media, null=True, on_delete=models.CASCADE, related_name='recording')
     status = models.SmallIntegerField(
         choices=STATUS_NAMES.items(), default=STATUS_NONE)
     pid = models.IntegerField(null=True)
@@ -522,11 +558,11 @@ class MovieManager(DefaultTypeManager):
 
 
 class Movie(Media):
+    program = models.OneToOneField(
+        Program, on_delete=models.SET_NULL, null=True, related_name='movies')
     width = models.SmallIntegerField(null=True)
     height = models.SmallIntegerField(null=True)
     video_enc = models.CharField(null=True, max_length=32)
-    actors = models.ManyToManyField(Actor)
-    actors = models.ManyToManyField(Actor)
     size = models.IntegerField(null=True)
     audio_enc = models.CharField(null=True, max_length=32)
     duration = models.DecimalField(null=True, max_digits=12, decimal_places=6)

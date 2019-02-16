@@ -37,4 +37,6 @@ class DeviceMiddleware:
                         last_ip_address=request.META.get('REMOTE_ADDR', None),
                         modified=timezone.now())  # Not sure this is necessary.
 
+            setattr(request, 'device', device)
+
         return self.get_response(request)

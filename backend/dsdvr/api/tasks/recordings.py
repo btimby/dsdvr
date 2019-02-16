@@ -13,7 +13,7 @@ import psutil
 from django.utils import timezone
 from django.db.transaction import atomic
 
-from api.models import Recording, Library, Show
+from api.models import Recording, Library, Media
 from api.tasks import BaseTask, metadata
 
 from main import util
@@ -38,9 +38,9 @@ class RecordingControl(object):
         if library is None:
             raise RuntimeError('No library for recordings')
 
-        show, _ = Show.objects.get_or_create_from_program(
+        media, _ = Media.objects.get_or_create_from_program(
             self.recording.program, library=library)
-        recording_path = util.get_next_recording(show.abs_path)
+        recording_path = util.get_next_recording(media.abs_path)
 
         command = [
             'ffmpeg', '-loglevel', 'error', '-n', '-i',
@@ -63,7 +63,7 @@ class RecordingControl(object):
         LOGGER.info('Spawning: "%s"', " ".join(command))
         process = subprocess.Popen(command, stderr=log_file, shell=False)
         self.recording.update(
-            show=show, status=Recording.STATUS_RECORDING, pid=process.pid)
+            media=media, status=Recording.STATUS_RECORDING, pid=process.pid)
 
         # Let ffmpeg get started, then check if it died and report stderr.
         try:
@@ -78,7 +78,7 @@ class RecordingControl(object):
                 util.last_3_lines(process.stderr))
 
         try:
-            metadata.omdb(show)
+            metadata.omdb(media)
 
         except Exception as e:
             LOGGER.exception(e)
@@ -121,9 +121,9 @@ class RecordingControl(object):
         mpegts as a container.
         '''
         # TODO: Here is where we would skip commercials etc.
-        util.combine_recordings(self.recording.show.path)
+        util.combine_recordings(self.recording.media.abs_path)
         try:
-            metadata.ffprobe(self.recording.show)
+            metadata.ffprobe(self.recording.media)
 
         except Exception as e:
             LOGGER.exception(e)

@@ -15,7 +15,7 @@ from api.views.libraries import LibraryViewSet
 from api.views.shows import ShowViewSet
 from api.views.channels import ChannelViewSet
 from api.views.devices import DeviceViewSet
-from api.views.actors import ActorViewSet
+from api.views.people import PersonViewSet
 from api.views.ratings import RatingViewSet
 from api.views.categories import CategoryViewSet
 from api.views.movies import MovieViewSet
@@ -35,7 +35,7 @@ router.register('shows', ShowViewSet, base_name='shows')
 router.register('movies', MovieViewSet, base_name='movies')
 router.register('channels', ChannelViewSet, base_name='channels')
 router.register('devices', DeviceViewSet, base_name='devices')
-router.register('actors', ActorViewSet, base_name='actors')
+router.register('people', PersonViewSet, base_name='people')
 router.register('ratings', RatingViewSet, base_name='ratings')
 router.register('categories', CategoryViewSet, base_name='categories')
 router.register('programs', ProgramViewSet, base_name='programs')

@@ -12,8 +12,8 @@ from rest_framework import serializers
 from drf_queryfields import QueryFieldsMixin
 
 from api.models import (
-    Show, Recording, Program, Channel, Library, Tuner, Device, Actor,
-    Rating, Category, Movie, Stream, Media, Series,
+    Show, Recording, Program, Channel, Library, Tuner, Device, Rating,
+    Category, Movie, Stream, Media, Series, Person, DeviceCursor
 )
 from api.tasks import STATUS_NAMES
 from api.tasks.recordings import TaskRecordingManager
@@ -100,6 +100,19 @@ class MovieSerializer(serializers.ModelSerializer):
 
     def get_path(self, obj):
         return obj.abs_path
+
+
+class SeriesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Series
+        fields = '__all__'
+        read_only_fields = ('id', 'path')
+
+    library = serializers.SlugRelatedField(read_only=True, slug_field='name')
+    rating = serializers.SlugRelatedField(read_only=True, slug_field='name')
+    category = serializers.SlugRelatedField(read_only=True, slug_field='name')
+    type = DisplayChoiceField(
+        choices=list(Show.TYPE_NAMES.items()), read_only=True)
 
 
 class RecordingSerializer(serializers.ModelSerializer):
@@ -250,6 +263,7 @@ class MediaSerializer(serializers.ModelSerializer):
     serializer_classes = {
         Media.TYPE_SHOW: ('show', ShowSerializer),
         Media.TYPE_MOVIE: ('movie', MovieSerializer),
+        Media.TYPE_SERIES: ('series', SeriesSerializer),
     }
 
     path = serializers.SerializerMethodField()
@@ -298,9 +312,9 @@ class DeviceSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
 
-class ActorSerializer(serializers.ModelSerializer):
+class PersonSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Actor
+        model = Person
         fields = '__all__'
         read_only_fields = ('id',)
 
@@ -319,18 +333,48 @@ class CategorySerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
 
+class CursorField(serializers.DecimalField):
+    getter_name = 'get_cursor'
+    setter_name = 'set_cursor'
+
+    def __init__(self, method_name=None, **kwargs):
+        kwargs['source'] = '*'
+        super(CursorField, self).__init__(**kwargs)
+
+    def to_representation(self, value):
+        method = getattr(self.parent, 'get_cursor')
+        value = method(value)
+        return value
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        return {'cursor': value}
+
+
 class StreamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Stream
         fields = '__all__'
         read_only_fields = ('id', 'pid', 'path')
-        extra_kwargs = {
-            'resume_seconds': {'required': False},
-        }
 
     type = DisplayChoiceField(
         choices=list(Stream.TYPE_NAMES.items()))
     url = serializers.SerializerMethodField()
+    cursor = CursorField(max_digits=12, decimal_places=6)
+
+    # NOTE: this seems a bit hacky, but the create() and update() overrides
+    # Allow for a writable SerializerMethodField().
+    def create(self, validated_data):
+        cursor = validated_data.pop('cursor', None)
+        obj = super().create(validated_data)
+        self._set_devicecursor(obj, cursor)
+        return obj
+
+    def update(self, instance, validated_data):
+        cursor = validated_data.pop('cursor', None)
+        obj = super().update(instance, validated_data)
+        self._set_devicecursor(obj, cursor)
+        return obj
 
     def get_url(self, obj):
         url = reverse('streams-playlist', args=[obj.id])
@@ -342,6 +386,36 @@ class StreamSerializer(serializers.ModelSerializer):
             pass
 
         return url
+
+    def get_cursor(self, obj):
+        try:
+            request = self.context['request']
+
+        except KeyError as e:
+            LOGGER.warning(e, exc_info=True)
+            return
+
+        try:
+            dc = DeviceCursor.objects.get(stream=obj, device=request.device)
+            return dc.cursor
+
+        except DeviceCursor.DoesNotExist:
+            return 0.0
+
+    def _set_devicecursor(self, obj, cursor):
+        if cursor is None:
+            return
+
+        try:
+            request = self.context['request']
+
+        except KeyError as e:
+            LOGGER.warning(e, exc_info=True)
+            return
+
+        dc, _ = DeviceCursor.objects.get_or_create(
+            stream=obj, device=request.device)
+        dc.update(cursor=cursor)
 
 
 class SeriesSerializer(serializers.ModelSerializer):

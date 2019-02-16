@@ -9,7 +9,9 @@ from django.db.transaction import atomic
 
 from api.tasks import BaseTask
 from api.settings import OMDB_API_KEY
-from api.models import Library, Media, Series, Actor, Category, Rating
+from api.models import (
+    Library, Media, Series, Category, Rating, Episode, Person, MediaActor,
+)
 
 from main import util
 
@@ -41,7 +43,7 @@ def ffprobe(media):
                 info = ffmpeg.probe(path)
 
             except FfmpegError as e:
-                LOGGER.warning(e, exc_info=True)
+                LOGGER.warning(e.stderr, exc_info=True)
                 continue
 
             format = info['format']
@@ -103,8 +105,8 @@ def omdb(media):
 
     if 'actors' in info:
         for name in info['actors'].split(', '):
-            actor, _ = Actor.objects.get_or_create(name=name)
-            actors.append(actor)
+            person, _ = Person.objects.get_or_create(name=name)
+            actors.append(person)
 
     if info['type'] == 'series':
         series, _ = Series.objects.get_or_create(
@@ -118,14 +120,18 @@ def omdb(media):
             show=media, series=series, season=season, episode=episode)
 
         media.categories.add(*categories)
-        media.actors.add(*actors)
+        for person in actors:
+            MediaActor.objects.get_or_create(media=media, person=person)
         series.categories.add(*categories)
-        series.actors.add(*actors)
+        for person in actors:
+            MediaActor.objects.get_or_create(media=series.media, person=person)
 
     else:
         media.update(**metadata)
         media.categories.add(*categories)
-        media.actors.add(*actors)
+
+        for person in actors:
+            MediaActor.objects.get_or_create(media=media, person=person)
 
     return metadata
 
