@@ -48,9 +48,6 @@ def _tail(command, path):
                     written += len(data)
                     output.write(data)
 
-            else:
-                time.sleep(0.1)
-
     LOGGER.info(
         'Recording process exited with: %i after writing %i bytes',
         process.poll(), written)
@@ -76,7 +73,7 @@ class RecordingControl(object):
             self.recording.program)
 
         # Just to be safe, this is our working dir...
-        os.makedirs(media.abs_path, exist_ok=True)
+        os.makedirs(dirname(media.abs_path), exist_ok=True)
 
         command = [
             'ffmpeg', '-loglevel', 'error', '-y', '-i',

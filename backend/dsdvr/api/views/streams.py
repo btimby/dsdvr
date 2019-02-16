@@ -31,7 +31,7 @@ LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(logging.NullHandler())
 
-WRITER_PROCESS_NAMES = ('ffmpeg',)
+WRITER_PROCESS_NAMES = ('ffmpeg', 'python')
 
 
 def find_free_port(interface='localhost'):

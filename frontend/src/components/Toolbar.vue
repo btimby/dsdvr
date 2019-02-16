@@ -28,7 +28,7 @@
 
         <v-divider></v-divider>
 
-        <div v-for="item in menu" :key="item.id">
+        <div v-for="item in local.menu" :key="item.id">
           <v-subheader v-if="item.heading">{{ item.heading }}</v-subheader>
           <v-divider v-if="item.heading"></v-divider>
 
@@ -99,10 +99,16 @@ export default {
               { id: 'home', icon: 'dashboard', title: 'Home', route: '/'},
               { id: 'about', icon: 'subject', title: 'About', route: '/about'},
               { id: 'guide', icon: 'line_style', title: 'Guide', route: '/guide'},
+            ]
+          },
+          {
+            id: 'library',
+            heading: 'Library',
+            items: [
               { id: 'recordings', icon: 'save_alt', title: 'Recordings', route: '/recordings'},
               { id: 'media', icon: 'theaters', title: 'Media', route: '/media'},
             ]
-          }
+          },
         ]
       },
 
@@ -111,12 +117,6 @@ export default {
   },
 
   computed: {
-    menu() {
-      // Build a menu consisting of our static items and libraries...
-      const menu = [...this.local.menu];
-      return menu;
-    },
-
     account() {
       const account = Object.assign({}, this.store.user);
       account.icon = getGravatar(account.email);
