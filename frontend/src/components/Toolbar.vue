@@ -91,7 +91,6 @@ export default {
   data() {
     return {
       local: {
-        libraries: [],
         drawer: null,
         menu: [
           {
@@ -101,6 +100,7 @@ export default {
               { id: 'about', icon: 'subject', title: 'About', route: '/about'},
               { id: 'guide', icon: 'line_style', title: 'Guide', route: '/guide'},
               { id: 'recordings', icon: 'save_alt', title: 'Recordings', route: '/recordings'},
+              { id: 'media', icon: 'theaters', title: 'Media', route: '/media'},
             ]
           }
         ]
@@ -114,19 +114,6 @@ export default {
     menu() {
       // Build a menu consisting of our static items and libraries...
       const menu = [...this.local.menu];
-      const libraries = [];
-
-      this.local.libraries.forEach(library => {
-        libraries.push({
-          id: library.id,
-          title: library.name,
-          icon: 'theaters',
-          route: `/library/${library.id}/`
-        });
-      });
-
-      menu.push({ id: 'libraries', heading: 'Libraries', items: libraries });
-
       return menu;
     },
 
@@ -136,12 +123,5 @@ export default {
       return account;
     }
   },
-
-  mounted() {
-    this.$store.getLibraries()
-      .then(r => {
-        this.local.libraries = r.data;
-      });
-  }
 }
 </script>

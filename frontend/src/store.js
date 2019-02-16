@@ -39,38 +39,8 @@ class Store {
             });
     }
 
-    getLibraries(options) {
-        let url = '/api/libraries/';
-        if (options && !options.media)
-            url += '?fields!=media';
-        return axios.get(url)
-            .catch(e => {
-                console.log(e);
-                throw e;
-            });
-    }
-
-    getLibrary(libraryId, options) {
-        let url = `/api/libraries/${libraryId}/`;
-        if (options && !options.media)
-            url += '?fields!=media';
-        return axios.get(url)
-            .catch(e => {
-                console.log(e);
-                throw e;
-            });
-    }
-
-    deleteLibrary(libraryId) {
-        return axios.delete(`/api/libraries/${libraryId}/`)
-            .catch(e => {
-                console.log(e);
-                throw e;
-            });
-    }
-
-    getLibraryMedia(libraryId) {
-        return axios.get(`/api/libraries/${libraryId}/media/`)
+    getMedia() {
+        return axios.get('/api/media/')
             .catch(e => {
                 console.log(e);
                 throw e;

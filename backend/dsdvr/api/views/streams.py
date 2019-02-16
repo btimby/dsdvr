@@ -243,11 +243,11 @@ class CreatingStreamSerializer(StreamSerializer):
         ]
 
         LOGGER.debug(
-            'Piping %s to: "%s"', media.abs_path, " ".join(command))
+            'Piping %s to: "%s"', obj.media.abs_path, " ".join(command))
 
         # The video file could be written to, use tail to follow the file.
         LOGGER.info('Starting transcoding daemon')
-        pid = _tail_to_ffmpeg(media.abs_path, command, playlist)
+        pid = _tail_to_ffmpeg(obj.media.abs_path, command, playlist)
         LOGGER.info('Transcoding daemon on pid: %i', pid)
 
         obj.update(pid=pid, path=temp)
