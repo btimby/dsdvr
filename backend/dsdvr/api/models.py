@@ -15,6 +15,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 
 from main import settings
 
@@ -170,6 +171,44 @@ class DefaultTypeManager(models.Manager):
             default_type=self.DEFAULT_TYPE)
 
 
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None):
+        """
+        Creates and saves a User with the given email, date of
+        birth and password.
+        """
+        if not email:
+            raise ValueError('Users must have an email address')
+
+        user = self.model(email=self.normalize_email(email))
+
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password):
+        """
+        Creates and saves a superuser with the given email, date of
+        birth and password.
+        """
+        user = self.create_user(
+            email,
+            password=password,
+        )
+        user.is_admin = True
+        user.save(using=self._db)
+        return user
+
+
+class User(AbstractUser):
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    email = models.EmailField(unique=True)
+
+    objects = UserManager()
+
+
 class Setting(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256)
@@ -313,7 +352,7 @@ class Media(UpdateMixin, CreatedModifiedModel):
 
     objects = MediaManager()
 
-    def type_model(self):
+    def subtype_model(self):
         if self.type == Media.TYPE_MOVIE:
             return Movie
 
@@ -327,7 +366,7 @@ class Media(UpdateMixin, CreatedModifiedModel):
             raise ValueError(
                 'Unsupported media type %s', Media.TYPE_NAMES[self.type])
 
-    def type_instance(self):
+    def subtype(self):
         if self.type == Media.TYPE_MOVIE:
             return self.movie
 
@@ -343,7 +382,7 @@ class Media(UpdateMixin, CreatedModifiedModel):
 
     @cached_property
     def abs_path(self):
-        return self.type_instance().abs_path
+        return self.subtype().abs_path
 
     @cached_property
     def frame0_path(self):
@@ -356,6 +395,9 @@ class SeriesManager(DefaultTypeManager):
 
 class Series(Media):
     objects = SeriesManager()
+
+    def subtype(self):
+        return self
 
 
 class ProgramManager(models.Manager):
@@ -416,9 +458,9 @@ class ShowManager(DefaultTypeManager):
     DEFAULT_TYPE = Media.TYPE_SHOW
 
 
-class Episode(models.Model):
+class Episode(UpdateMixin, models.Model):
     series = models.ForeignKey(Series, on_delete=models.CASCADE)
-    show = models.ForeignKey('Show', on_delete=models.CASCADE, unique=True)
+    show = models.OneToOneField('Show', on_delete=models.CASCADE)
     season = models.PositiveSmallIntegerField(null=True)
     episode = models.PositiveSmallIntegerField(null=True)
 
@@ -448,6 +490,9 @@ class Show(Media):
     @cached_property
     def abs_path(self):
         return self._meta.get_field('path').absolute(self)
+
+    def subtype(self):
+        return self
 
     objects = ShowManager()
 
@@ -569,3 +614,6 @@ class Movie(Media):
     @cached_property
     def abs_path(self):
         return self._meta.get_field('path').absolute(self)
+
+    def subtype(self):
+        return self

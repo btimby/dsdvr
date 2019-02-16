@@ -137,7 +137,7 @@ class RecordingControl(object):
         '''
         # TODO: Here is where we would skip commercials etc.
         try:
-            metadata.ffprobe(self.recording.media.type_instance())
+            metadata.ffprobe(self.recording.media.subtype())
 
         except Exception as e:
             LOGGER.exception(e)

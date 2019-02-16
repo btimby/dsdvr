@@ -110,10 +110,10 @@ def omdb(media):
         series.update(**metadata)
 
         # Guide data _may_ provide these at some point...
-        season = episode = None
-
-        Episode.objects.create(
-            show=media, series=series, season=season, episode=episode)
+        nseason = nepisode = None
+        episode, _ = Episode.objects.get_or_create(
+            show=media.subtype(), series=series)
+        episode.update(season=nseason, episode=nepisode)
 
         media.categories.add(*categories)
         for person in actors:
@@ -121,6 +121,9 @@ def omdb(media):
         series.categories.add(*categories)
         for person in actors:
             MediaActor.objects.get_or_create(media=series, person=person)
+
+        # The OMDB poster is typically of higher quality...
+        media.update(poster=metadata['poster'])
 
     else:
         media.update(**metadata)
@@ -149,7 +152,7 @@ class TaskMetadataFetch(BaseTask):
             return
 
         try:
-            self._get_metadata(media)
+            self._get_metadata(obj)
 
         finally:
             self.lock.release()
