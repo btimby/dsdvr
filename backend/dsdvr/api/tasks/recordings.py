@@ -74,6 +74,9 @@ class RecordingControl(object):
         media, _ = Media.objects.get_or_create_from_program(
             self.recording.program)
 
+        # Just to be safe, this is our working dir...
+        os.makedirs(media.abs_path, exist_ok=True)
+
         command = [
             'ffmpeg', '-loglevel', 'error', '-y', '-i',
             self.recording.program.channel.stream, '-c:v', 'copy', '-pix_fmt',

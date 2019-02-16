@@ -90,7 +90,6 @@ class DirectoryPathField(BasePathField):
             raise ValueError('Path: %s is not a directory')
 
     def _create_path(self, path):
-        LOGGER.debug('Creating: %s', path)
         os.makedirs(path, exist_ok=True)
 
 
@@ -113,11 +112,9 @@ class FilePathField(BasePathField):
         if self.auto_create_parent or self.auto_create:
             parent = dirname(path)
             if parent:
-                LOGGER.debug('Creating: %s', parent)
                 os.makedirs(parent, exist_ok=True)
 
         if self.auto_create:
-            LOGGER.debug('Creating: %s', path)
             pathlib.Path(path).touch(exist_ok=True)
 
     def pre_save(self, model_instance, add):
