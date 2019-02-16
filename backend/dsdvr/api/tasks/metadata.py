@@ -13,8 +13,6 @@ from api.models import (
     Library, Media, Series, Category, Rating, Episode, Person, MediaActor,
 )
 
-from main import util
-
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
@@ -37,39 +35,40 @@ def _omdb_client():
 
 @atomic
 def ffprobe(media):
+    LOGGER.info('Getting metadata from file...')
     try:
-        for path in util.get_recordings(media.abs_path):
-            try:
-                info = ffmpeg.probe(path)
+        metadata = {}
+        try:
+            info = ffmpeg.probe(media.abs_path)
 
-            except FfmpegError as e:
-                LOGGER.warning(e.stderr, exc_info=True)
-                continue
-
-            format = info['format']
-
-            video_enc = audio_enc = width = height = None
-            for stream in info['streams']:
-                if stream['codec_type'] == 'video':
-                    video_enc = stream['codec_name']
-                    width = stream['width']
-                    height = stream['height']
-
-                elif stream['codec_type'] == 'audio':
-                    audio_enc = stream['codec_name']
-
-            metadata = {
-                'duration': float(format['duration']),
-                'size': int(format['size']),
-                'format': format['format_name'],
-                'width': width,
-                'height': height,
-                'audio_enc': audio_enc,
-                'video_enc': video_enc,
-            }
-
-            media.update(**metadata)
+        except FfmpegError as e:
+            LOGGER.warning(e.stderr, exc_info=True)
             return metadata
+
+        format = info['format']
+
+        video_enc = audio_enc = width = height = None
+        for stream in info['streams']:
+            if stream['codec_type'] == 'video':
+                video_enc = stream['codec_name']
+                width = stream['width']
+                height = stream['height']
+
+            elif stream['codec_type'] == 'audio':
+                audio_enc = stream['codec_name']
+
+        metadata.update({
+            'duration': float(format['duration']),
+            'size': int(format['size']),
+            'format': format['format_name'],
+            'width': width,
+            'height': height,
+            'audio_enc': audio_enc,
+            'video_enc': video_enc,
+        })
+
+        media.update(**metadata)
+        return metadata
 
     except Exception as e:
         LOGGER.exception(e)
@@ -79,8 +78,6 @@ def ffprobe(media):
 def omdb(media):
     LOGGER.info('Fetching medata from OMDB...')
     info = _omdb_client().get(title=media.title)
-
-    LOGGER.debug('Got: %s', info)
     metadata = {
         'title': info['title'],
         'subtitle': info['title'],

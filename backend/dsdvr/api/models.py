@@ -4,9 +4,11 @@ import uuid
 import signal
 import logging
 import pathlib
+import random
+import string
 
 from os.path import join as pathjoin
-from os.path import isdir, isfile, relpath, dirname
+from os.path import isdir, isfile, relpath, dirname, splitext
 from datetime import timedelta
 
 from django.db import models
@@ -14,12 +16,21 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.functional import cached_property
 
-from main import util
-
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(logging.NullHandler())
+
+
+def _get_program_filename(program):
+    '''
+    Build a filesystem path for the given media item.
+    '''
+    title = program.title.replace(' ', '.')
+    airtime = program.start.strftime('%m-%d-%Y-%H:%M')
+    unique = ''.join(
+        random.choices(string.ascii_letters + string.digits, k=6))
+    return pathjoin(title, airtime, '%s-%s.mpeg' % (title, unique))
 
 
 class BasePathField(models.CharField):
@@ -278,24 +289,28 @@ class MediaManager(DefaultTypeManager):
         # Generate a path for this program. It will be relative to it's library
         # root.
         if 'path' not in defaults:
-            defaults['path'] = util.get_program_filename(program)
+            defaults['path'] = _get_program_filename(program)
 
-        is_movie = False
+        # If the program guide placed the program into "Movie" category, then
+        # we want the appropriate media type.
+        media_class = Show
         for cat in program.categories.all():
             if cat.name.lower() == 'movie':
-                is_movie = True
-
-        media_class = Movie if is_movie else Show
+                media_class = Movie
+                break
 
         media, created = media_class.objects.get_or_create(
             program=program, defaults=defaults)
-        media.update(**defaults)
 
-        for actor in program.actors.all():
-            MediaActor.objects.get_or_create(
-                media=media, person=actor.person)
+        if created:
+            media.update(**defaults)
 
-        media.categories.add(*program.categories.all())
+            for actor in program.actors.all():
+                MediaActor.objects.get_or_create(
+                    media=media, person=actor.person)
+
+            media.categories.add(*program.categories.all())
+
         return media, created
 
 
@@ -353,9 +368,13 @@ class Media(UpdateMixin, CreatedModifiedModel):
             raise ValueError(
                 'Unsupported media type %s', Media.TYPE_NAMES[self.type])
 
-    @property
+    @cached_property
     def abs_path(self):
         return self.type_instance().abs_path
+
+    @cached_property
+    def frame0_path(self):
+        return '%s-frame0.jpg' % splitext(self.abs_path)[0]
 
 
 class SeriesManager(DefaultTypeManager):
