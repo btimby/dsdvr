@@ -335,8 +335,7 @@ class Program(UpdateMixin, CreatedModifiedModel):
         Channel, on_delete=models.CASCADE, related_name='programs')
     episode = models.ForeignKey(
         Episode, on_delete=models.CASCADE, null=True, related_name='programs')
-    category = models.ForeignKey(
-        Category, on_delete=models.CASCADE, null=True, related_name='programs')
+    categories = models.ManyToManyField(Category, related_name='programs')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
     actors = models.ManyToManyField(Actor)
     title = models.CharField(max_length=256)
@@ -359,12 +358,10 @@ class Program(UpdateMixin, CreatedModifiedModel):
 
 class Media(UpdateMixin, CreatedModifiedModel):
     TYPE_MOVIE = 0
-    TYPE_MUSIC = 1
     TYPE_SHOW = 2
 
     TYPE_NAMES = {
         TYPE_MOVIE: 'Movie',
-        TYPE_MUSIC: 'Music',
         TYPE_SHOW: 'Show',
     }
 
@@ -379,9 +376,7 @@ class Media(UpdateMixin, CreatedModifiedModel):
     subtitle = models.CharField(max_length=256)
     desc = models.TextField()
     poster = models.URLField(max_length=256, null=True)
-    category = models.ForeignKey(
-        Category, on_delete=models.CASCADE, null=True,
-        related_name='%(class)ss')
+    categories = models.ManyToManyField(Category, related_name='media')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
     has_metadata = models.BooleanField(default=False)
     duration = models.DecimalField(null=True, max_digits=12, decimal_places=6)
@@ -525,37 +520,6 @@ class Recording(UpdateMixin, CreatedModifiedModel):
                 LOGGER.warning(e, exc_info=True)
 
         return super().delete(*args, **kwargs)
-
-
-class Artist(UpdateMixin, CreatedModifiedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=256)
-    poster = models.URLField(max_length=256, null=True)
-    desc = models.TextField(null=True)
-
-
-class Album(UpdateMixin, CreatedModifiedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    artist = models.ForeignKey(
-        Artist, null=True, on_delete=models.CASCADE, related_name='albums')
-    title = models.CharField(max_length=256)
-    poster = models.URLField(max_length=256, null=True)
-    year = models.SmallIntegerField()
-    desc = models.TextField(null=True)
-
-
-class MusicManager(DefaultTypeManager):
-    DEFAULT_TYPE = Media.TYPE_MUSIC
-
-
-class Music(Media):
-    artist = models.ForeignKey(
-        Artist, on_delete=models.CASCADE, related_name='songs')
-    album = models.ForeignKey(
-        Album, on_delete=models.CASCADE, related_name='songs')
-    track = models.SmallIntegerField(null=True)
-
-    objects = MusicManager()
 
 
 class MovieManager(DefaultTypeManager):

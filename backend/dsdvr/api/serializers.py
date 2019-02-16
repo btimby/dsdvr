@@ -13,7 +13,7 @@ from drf_queryfields import QueryFieldsMixin
 
 from api.models import (
     Episode, Show, Recording, Program, Channel, Library, Tuner, Device, Actor,
-    Rating, Category, Movie, Music, Stream, Media, Artist, Album, Series,
+    Rating, Category, Movie, Stream, Media, Series,
 )
 from api.tasks import STATUS_NAMES
 from api.tasks.recordings import RecordingControl
@@ -95,23 +95,6 @@ class ShowSerializer(serializers.ModelSerializer):
 class MovieSerializer(serializers.ModelSerializer):
     class Meta:
         model = Movie
-        fields = '__all__'
-        read_only_fields = ('id', 'path')
-
-    library = serializers.SlugRelatedField(read_only=True, slug_field='name')
-    rating = serializers.SlugRelatedField(read_only=True, slug_field='name')
-    category = serializers.SlugRelatedField(read_only=True, slug_field='name')
-    type = DisplayChoiceField(
-        choices=list(Show.TYPE_NAMES.items()), read_only=True)
-    path = serializers.SerializerMethodField()
-
-    def get_path(self, obj):
-        return obj.abs_path
-
-
-class MusicSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Music
         fields = '__all__'
         read_only_fields = ('id', 'path')
 
@@ -275,7 +258,6 @@ class MediaSerializer(serializers.ModelSerializer):
     serializer_classes = {
         Media.TYPE_SHOW: ('show', ShowSerializer),
         Media.TYPE_MOVIE: ('movie', MovieSerializer),
-        Media.TYPE_MUSIC: ('music', MusicSerializer),
     }
 
     path = serializers.SerializerMethodField()
@@ -368,20 +350,6 @@ class StreamSerializer(serializers.ModelSerializer):
             pass
 
         return url
-
-
-class ArtistSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Artist
-        fields = '__all__'
-        read_only_fields = ('id',)
-
-
-class AlbumSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Album
-        fields = '__all__'
-        read_only_fields = ('id',)
 
 
 class SeriesSerializer(serializers.ModelSerializer):
