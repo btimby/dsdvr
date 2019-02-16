@@ -196,7 +196,8 @@ class TaskGuideImport(BaseTask):
                     continue
 
                 elif el.tag == 'actor':
-                    data.setdefault('actors', []).append(self.get_actor(el.text))
+                    data.setdefault(
+                        'actors', []).append(self.get_actor(el.text))
                     continue
 
                 elif el.tag == 'length':
@@ -211,13 +212,11 @@ class TaskGuideImport(BaseTask):
                     else:
                         LOGGER.warning(
                             'length unit: %s unrecognized', el.attrib['units'])
-
-                    # Anything else we will ignore, the length will be
-                    # calculated from start and stop.
                     continue
 
                 elif el.tag == 'category':
-                    data['category'] = self._get_category(el.text)
+                    data.setdefault(
+                        'categories', []).append(self._get_category(el.text))
                     continue
 
                 elif el.tag == 'rating':
@@ -239,6 +238,7 @@ class TaskGuideImport(BaseTask):
                     start = data.pop('start')
                     stop = data.pop('stop')
                     actors = data.pop('actors', None)
+                    categories = data.pop('categories', None)
 
                     try:
                         with atomic(immediate=True):
@@ -249,6 +249,9 @@ class TaskGuideImport(BaseTask):
                         
                             if actors:
                                 program.actors.add(*actors)
+
+                            if categories:
+                                program.categories.add(*categories)
 
 
                     except IntegrityError as e:

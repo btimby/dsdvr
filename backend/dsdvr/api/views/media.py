@@ -17,6 +17,8 @@ from rest_framework import serializers, viewsets, views
 from rest_framework.response import Response
 from rest_framework import status
 
+from main import util
+
 from api.models import Media, Stream
 from api.serializers import MediaSerializer, StreamSerializer
 from api.views.streams import CreatingStreamSerializer
@@ -28,11 +30,24 @@ LOGGER.addHandler(logging.NullHandler())
 
 
 def make_frame0(media_path, frame0_path):
-    # TODO: No way to specify -y before input...
-    ffmpeg \
-        .input(media_path) \
-        .output(frame0_path, vframes=1, f='image2') \
-        .run()
+    file_names = util.get_recordings(media_path)
+    for fn in file_names:
+        command = [
+            'ffmpeg', '-y', '-i', fn, '-vframes', '1', '-f', 'image2',
+            frame0_path
+        ]
+        LOGGER.info('Spawning ffmpeg: %s', ' '.join(command))
+
+        try:
+            subprocess.run(command, check=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+
+        except subprocess.CalledProcessError as e:
+            LOGGER.warning(e.stderr, exc_info=True)
+            continue
+
+        else:
+            break
 
 
 class MediaViewSet(viewsets.ModelViewSet):

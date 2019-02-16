@@ -126,9 +126,10 @@ class FilePathField(BasePathField):
 
     def pre_save(self, model_instance, add):
         path = super().pre_save(model_instance, add)
+        abs_path = self.absolute(model_instance)
 
         if self.auto_create_parent:
-            self._create_path(path)
+            self._create_path(abs_path)
 
         return path
 
@@ -402,7 +403,6 @@ class ShowManager(DefaultTypeManager):
             'desc': program.desc,
             'duration': program.duration,
             'poster': program.poster,
-            'category': program.category,
             'rating': program.rating,
         })
 
@@ -411,14 +411,15 @@ class ShowManager(DefaultTypeManager):
         if 'path' not in defaults:
             title = program.title.replace(' ', '.')
             airtime = program.start.strftime('%m-%d-%Y-%H:%M')
-            unique = ''.join(
-                random.choices(string.ascii_letters + string.digits, k=6))
+            # unique = ''.join(
+            #     random.choices(string.ascii_letters + string.digits, k=6))
             defaults['path'] = pathjoin(
                 title, airtime, 'recording0.mpeg')
 
         show, created = self.get_or_create(program=program, defaults=defaults)
         show.update(**defaults)
-        show.actors.add(program.actors.all())
+        show.actors.add(*program.actors.all())
+        show.categories.add(*program.categories.all())
         return show, created
 
 
