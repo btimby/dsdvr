@@ -22,6 +22,7 @@ from api.views.programs import ProgramViewSet
 from api.views.media import MediaViewSet, MediaStreamViewSet, poster, frame0
 from api.views.series import SeriesViewSet
 from api.views.me import MeView
+from api.views.status import StatusView
 
 
 router = DefaultRouter()
@@ -67,6 +68,8 @@ urlpatterns = [
 
     path('media/<uuid:pk>/poster.jpg', poster, name='media-poster'),
     path('media/<uuid:pk>/frame0.jpg', frame0, name='media-frame0'),
+
+    path('status/', StatusView.as_view(), name='status'),
 
     # Authentication
     path(
