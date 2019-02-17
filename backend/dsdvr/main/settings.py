@@ -13,7 +13,8 @@ STORAGE_TEMP = os.environ.get('DSDVR_STORAGE_TEMP',
                               '/var/tmp/dsdvr')
 
 
-if 'siteprefs' in settings.INSTALLED_APPS:
+# Causes problems with disabled admin.
+""" if 'siteprefs' in settings.INSTALLED_APPS:
     from siteprefs.toolbox import preferences, patch_locals
 
     with preferences() as prefs:
@@ -25,4 +26,4 @@ if 'siteprefs' in settings.INSTALLED_APPS:
             prefs.group('Storage Settings',
                         (OMDB_API_KEY, ),
                         static=True),
-        )
+        ) """

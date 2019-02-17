@@ -2,33 +2,21 @@
     <v-container fluid fill-height>
     <v-layout align-center justify-center>
         <v-flex xs12 sm8 md4>
-        <v-card class="elevation-12">
+        <v-card dark class="elevation-12">
             <v-toolbar dark color="primary">
             <v-toolbar-title>Login form</v-toolbar-title>
             <v-spacer></v-spacer>
-            <v-tooltip bottom>
-                <v-btn
-                icon
-                large
-                :href="source"
-                target="_blank"
-                slot="activator"
-                >
-                <v-icon large>code</v-icon>
-                </v-btn>
-                <span>Source</span>
-            </v-tooltip>
             </v-toolbar>
-            <v-card-text>
-            <v-form>
-                <v-text-field v-model="local.email" prepend-icon="person" name="email" label="Email" type="text"></v-text-field>
-                <v-text-field v-model="local.password" prepend-icon="lock" name="password" label="Password" id="password" type="password"></v-text-field>
+            <v-form @submit.prevent="login" ref="loginForm">
+                <v-card-text>
+                    <v-text-field required :rules="local.emailRules" v-model="local.email" prepend-icon="person" label="Email"></v-text-field>
+                    <v-text-field required :rules="local.passwordRules" v-model="local.password" prepend-icon="lock" label="Password" type="password"></v-text-field>
+                </v-card-text>
+                <v-card-actions>
+                <v-spacer></v-spacer>
+                    <v-btn type="submit" color="primary">Login</v-btn>
+                </v-card-actions>
             </v-form>
-            </v-card-text>
-            <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn color="primary" @click.prevent="login">Login</v-btn>
-            </v-card-actions>
         </v-card>
         </v-flex>
     </v-layout>
@@ -44,6 +32,14 @@ export default {
             local: {
                 email: null,
                 password: null,
+
+                emailRules: [
+                    v => !!v || 'E-mail is required',
+                    v => /.+@.+/.test(v) || 'E-mail must be valid'
+                ],
+                passwordRules: [
+                    v => !!v || 'Password is required',
+                ],
             },
             store: this.$store.state,
         }
@@ -51,7 +47,12 @@ export default {
 
     methods: {
         login() {
-            this.$store.login(this.local.email, this.local.password);
+            if (this.$refs.loginForm.validate()) {
+                this.$store.login(this.local.email, this.local.password)
+                    .then(r => {
+                        this.$router.push('home');
+                    })
+            }
         }
     },
 }

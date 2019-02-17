@@ -24,6 +24,11 @@
           <v-list-tile-content>
             <v-list-tile-title :title="account.email">{{ account.name }}</v-list-tile-title>
           </v-list-tile-content>
+
+          <v-btn small @click="logout">
+            Logout
+            <v-icon right>exit_to_app</v-icon>
+          </v-btn>
         </v-list-tile>
 
         <v-divider></v-divider>
@@ -116,10 +121,19 @@ export default {
     }
   },
 
+  methods: {
+    logout() {
+      this.$store.logout();
+      this.$router.push('login');
+    }
+  },
+
   computed: {
     account() {
       const account = Object.assign({}, this.store.user);
-      account.icon = getGravatar(account.email);
+      if (account.email) {
+        account.icon = getGravatar(account.email);
+      }
       return account;
     }
   },

@@ -3,25 +3,37 @@ import axios from "axios";
 let refreshInProgress = false;
 
 axios.interceptors.request.use (
-    config => {
-      const token = localStorage.getItem('accessToken');
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-      return config;
+    function(config) {
+        const token = localStorage.getItem('accessToken');
+        if (token)
+            config.headers.Authorization = `Bearer ${token}`;
+        return config;
     },
-    error => {
+    function(error) {
+        return Promise.reject (error);
+    }
+);
+
+axios.interceptors.response.use(
+    function(response) { return response;}, 
+    function(error) {
         const { config, response: { status } } = error;
 
         if (status === 401 && !refreshInProgress) {
             let refreshToken = localStorage.getItem('refreshToken');
-
             refreshInProgress = true;
 
             axios.post('/api/token/refresh/', {
                 'refresh': refreshToken,
             })
                 .then(r => {
-                    localStorage.setItem('accessToken', r.data.access);
-
+                    const token = r.data.access;
+                    localStorage.setItem('accessToken', token);
+                    config.headers.Authorization = `Bearer ${token}`;
+                    refreshInProgress = false;
+                    return axios.request(config);
+                })
+                .catch(e => {
                     refreshInProgress = false;
                 });
         } else {
@@ -36,42 +48,33 @@ class Store {
             nowPlaying: null,
             user: null,
         };
+
+        axios.get('/api/me/')
+            .then(r => {
+                this.state.user = r.data;
+            });
     }
 
     getTasks() {
         // Get tasks from the API...
-        return axios.get('/api/tasks/')
-            .catch(e => console.log(e));
+        return axios.get('/api/tasks/');
     }
 
     deleteTask(taskId) {
-        return axios.delete(`/api/tasks/${taskId}/`)
-            .catch(e => console.log(e))
+        return axios.delete(`/api/tasks/${taskId}/`);
     }
 
     getRecordings() {
         // Get recordings from the API...
-        return axios.get('/api/recordings/')
-            .catch(e => {
-                console.log(e);
-                throw e;
-            });
+        return axios.get('/api/recordings/');
     }
 
     deleteRecording(recordingId) {
-        return axios.delete(`/api/recordings/${recordingId}/`)
-            .catch(e => {
-                console.log(e);
-                throw e;
-            });
+        return axios.delete(`/api/recordings/${recordingId}/`);
     }
 
     getMedia() {
-        return axios.get('/api/media/')
-            .catch(e => {
-                console.log(e);
-                throw e;
-            });
+        return axios.get('/api/media/');
     }
 
     playVideo(media) {
@@ -82,10 +85,6 @@ class Store {
                 media.streamUrl = r.data.url;
                 media.streamCursor = r.data.cursor;
                 this.state.nowPlaying = media;
-            })
-            .catch(e => {
-                console.log(e);
-                throw e;
             });
     }
 
@@ -100,11 +99,7 @@ class Store {
 
     updateStreamCursor(mediaId, currentTime) {
         return axios.patch(
-            `/api/media/${mediaId}/stream/`, { cursor: currentTime })
-        .catch(e => {
-            console.log(e);
-            throw e;
-        });
+            `/api/media/${mediaId}/stream/`, { cursor: currentTime });
     }
 
     login(email, password) {
@@ -113,11 +108,12 @@ class Store {
                 localStorage.setItem('accessToken', r.data.access);
                 localStorage.setItem('refreshToken', r.data.refresh);
 
+                // TODO: extract this data from the JWT.
                 axios.get('/api/me/')
                     .then(r => {
                         this.state.user = r.data;
                     });
-            })
+            });
     }
 
     logout() {

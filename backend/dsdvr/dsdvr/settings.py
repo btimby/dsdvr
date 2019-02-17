@@ -39,7 +39,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    # 'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -198,7 +198,7 @@ CRON = (
 )
 
 # Allow application configuration to be edited in admin.
-SITEPREFS_EXPOSE_MODEL_TO_ADMIN = True
+SITEPREFS_EXPOSE_MODEL_TO_ADMIN = False
 
 WEBPACK_LOADER = {
     'DEFAULT': {

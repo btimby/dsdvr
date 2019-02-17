@@ -14,10 +14,12 @@ from os.path import dirname, isfile
 
 import psutil
 import daemon
+import m3u8
 
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.db.transaction import atomic
+from django.utils import timezone
 
 from rest_framework import viewsets
 from rest_framework import status
@@ -32,6 +34,67 @@ LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(logging.NullHandler())
 
 WRITER_PROCESS_NAMES = ('ffmpeg', 'python')
+
+
+class InvalidStreamError(Exception):
+    pass
+
+
+def validate_stream(stream):
+    # First check pid, if pid is alive
+    # Then check files, if pid is alive and there are files: Valid
+    # If there are files and pid is dead, then check playlist, segments and
+    # run-length.
+    try:
+        os.kill(stream.pid, 0)
+
+    except ProcessLookupError:
+        pid_alive = False
+    else:
+        pid_alive = True
+
+    try:
+        playlist_path = pathjoin(stream.abs_path, 'stream.m3u8')
+        if pid_alive and isfile(playlist_path):
+            # The pid is alive and the playlist exists, we can be reasonably
+            # sure the stream is good (being transcoded)
+            return
+
+        elif pid_alive:
+            # The pid is alive, but there is not yet a playlist. If the stream
+            # was modified recently, it may still be starting up.
+            if (stream.modified - timezone.now()).total_seconds() >= 8:
+                raise InvalidStreamError(
+                    'Transcoder produced no output in 8 seconds.')
+            return
+
+        else:
+            # Process is dead, it may be finished, validate that all segments
+            # exist. Also accumulate their durations to compare to original
+            # media duration.
+            duration, playlist = 0.0, m3u8.load(playlist_path)
+            for segment in playlist.segments:
+                segment_path = pathjoin(stream.abs_path, segment.uri)
+                if not isfile(segment_path):
+                    raise InvalidStreamError(
+                        'Segment not a file: %s' % segment_path)
+                duration += segment.duration
+
+            # The stream is intact, check that it's total duration is within 1%
+            # of the media duration.
+            ratio = duration / stream.media.duration
+            if ratio < 0.99:
+                raise InvalidStreamError(
+                    'Stream duration: %i / %i == %i' % (
+                        duration, stream.media.duration, ratio))
+
+            # Holy shit, it might be good.
+            return
+
+    except InvalidStreamError:
+        # If we found an error, delete the bad stream and raise it.
+        stream.delete()
+        raise
 
 
 def find_free_port(interface='localhost'):

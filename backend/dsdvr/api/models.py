@@ -172,7 +172,7 @@ class DefaultTypeManager(models.Manager):
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, password=None):
+    def create_user(self, email, name, password=None):
         """
         Creates and saves a User with the given email, date of
         birth and password.
@@ -180,19 +180,20 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError('Users must have an email address')
 
-        user = self.model(email=self.normalize_email(email))
+        user = self.model(email=self.normalize_email(email), name=name)
 
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password):
+    def create_superuser(self, email, name, password):
         """
         Creates and saves a superuser with the given email, date of
         birth and password.
         """
         user = self.create_user(
             email,
+            name,
             password=password,
         )
         user.is_admin = True
@@ -202,7 +203,7 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser):
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = ['name']
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     email = models.EmailField(
