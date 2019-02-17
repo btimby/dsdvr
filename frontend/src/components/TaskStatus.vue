@@ -42,8 +42,6 @@
 </template>
 
 <script>
-// TODO: This component is very much like RecordingButton.vue, the can be consolidated.
-
   export default {
     name: "TaskStatus",
 
@@ -72,27 +70,15 @@
 
     computed: {
         errored: function() {
-            const errored = [];
-
-            this.local.tasks.forEach((task) => {
-                if (task.status !== 'error')
-                    return;
-                errored.push(task);
+            return this.local.tasks.filter(task => {
+                return task.status === 'error'
             });
-
-            return errored;
         },
 
         running: function() {
-            const running = [];
-
-            this.local.tasks.forEach((task) => {
-                if (task.status !== 'running')
-                    return;
-                running.push(task);
+            return this.local.tasks.filter(task => {
+                return task.status === 'running';
             });
-
-            return running;
         },
 
         color: function() {
@@ -102,8 +88,10 @@
                 } else {
                     return 'red';
                 }
-            } else {
+            } else if (this.running.length) {
                 return 'green';
+            } else {
+                return 'grey';
             }
         }
     },

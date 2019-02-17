@@ -65,27 +65,15 @@
 
     computed: {
         errored: function() {
-            const errored = [];
-
-            this.local.recordings.forEach((task) => {
-                if (task.status !== 'error')
-                    return;
-                errored.push(task);
-            });
-
-            return errored;
+            return this.local.recordings.filter(recording => {
+                return recording.status === 'error';
+            })
         },
 
         running: function() {
-            const running = [];
-
-            this.local.recordings.forEach((task) => {
-                if (task.status !== 'recording')
-                    return;
-                running.push(task);
+            return this.local.recordings.filter(recording => {
+                return recording.status === 'recording';
             });
-
-            return running;
         },
 
         color: function() {
@@ -97,8 +85,9 @@
                 }                
             } else if (this.errored.length) {
                 return 'yellow';
+            } else {
+                return 'grey';
             }
-            return 'grey';
         }
     },
   }
