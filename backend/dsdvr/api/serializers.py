@@ -408,3 +408,15 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'email', 'name')
         read_only_fields = ('id', 'email')
+
+
+class ChannelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Channel
+        fields = '__all__'
+        read_only_fields = ('id',)
+
+    programs = serializers.SerializerMethodField()
+
+    def get_programs(self, obj):
+        return Program.objects.filter(channel=obj).count()

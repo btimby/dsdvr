@@ -1,7 +1,8 @@
 import os
 import logging
+import time
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import wraps
 from os.path import getsize
 from os.path import join as pathjoin
@@ -42,22 +43,21 @@ class throttle(object):
             pass
     """
     def __init__(self, seconds=0, minutes=0, hours=0):
-        self.throttle_period = timedelta(
+        self.throttle_secs = timedelta(
             seconds=seconds, minutes=minutes, hours=hours
-        )
+        ).seconds
         self.cache = {}
 
     def __call__(self, fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            now = datetime.now()
+            now = time.time()
             cache_key = (tuple(map(str, sorted(args))),
                          tuple(map(str, sorted(kwargs.items()))))
             last_call, last_result = \
-                self.cache.get(cache_key, (datetime.min, None))
+                self.cache.get(cache_key, (0, None))
 
-            time_since_last_call = now - last_call
-            if time_since_last_call > self.throttle_period:
+            if now - last_call > self.throttle_secs:
                 last_result = fn(*args, **kwargs)
                 self.cache[cache_key] = (now, last_result)
 
@@ -68,7 +68,6 @@ class throttle(object):
 
 @throttle(minutes=5)
 def get_directory_stats(path):
-    LOGGER.debug(path)
     size, count = 0, 0
     for root, _, files in os.walk(path):
         count += len(files)
@@ -76,7 +75,7 @@ def get_directory_stats(path):
             size += getsize(pathjoin(root, f))
 
     stats = {
-        'size': size,
+        'usage': size,
         'count': count,
     }
     return stats
@@ -85,18 +84,25 @@ def get_directory_stats(path):
 @throttle(seconds=90)
 def get_process_stats(pids):
     stats = {
+        'uptime': 0,
+        'count': len(pids),
         'cpu_percent': 0,
         'cpu_times': {'user': 0, 'system': 0},
         'mem_percent': 0.0,
         'mem_usage': 0,
     }
-    for pid in pids:
+    for i, pid in enumerate(pids):
         try:
             process = psutil.Process(pid)
 
             with process.oneshot():
+                if i == 0:
+                    # First item is main process pid, get uptime for that.
+                    stats['uptime'] = \
+                        round(time.time() - process.create_time(), 2)
+
                 stats['cpu_percent'] += process.cpu_percent()
-                stats['mem_percent'] += process.memory_percent()
+                stats['mem_percent'] += round(process.memory_percent(), 2)
                 stats['mem_usage'] += process.memory_info().rss
 
                 user, system = process.cpu_times()[:2]
@@ -138,12 +144,12 @@ class StatusSerializer(serializers.Serializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Some fields are only for authenticated users.
+        # Some fields are only for authenticated users pop them...
         if not self.context['request'].user.is_authenticated:
-            self.fields.pop('system')
             self.fields.pop('tasks')
             self.fields.pop('recordings')
             self.fields.pop('streams')
+            pass
 
     def get_system(self, obj):
         return get_system_stats()
@@ -159,6 +165,16 @@ class StatusSerializer(serializers.Serializer):
 
 
 class StatusView(views.APIView):
+    '''
+    There is a lot going on in this endpoint.
+
+    We return system metrics that the UI needs. Some metrics are expensive to
+    calculate, so a throttle decorator is used to cache results and only re-
+    execute the function at a specific interval (regardless of the polling
+    interval). Also, some metrics are sensitive and are only returned to an
+    authenticated user (although this endpoint is open).
+    '''
+
     permission_classes = (AllowAny,)
 
     def get(self, request):
