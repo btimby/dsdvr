@@ -1,5 +1,6 @@
 import logging
 import pytz
+import threading
 
 import os.path
 
@@ -76,6 +77,8 @@ class TaskGuideImport(BaseTask):
     </tv>
     '''
 
+    lock = threading.Lock()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.categories = {}
@@ -124,154 +127,162 @@ class TaskGuideImport(BaseTask):
             pass
 
     def _run(self, path_or_file=XMLTV_PATH):
-        LOGGER.info('Syncing guide data from XMLTV...')
-
-        if isinstance(path_or_file, str):
-            f = open(path_or_file, 'rb')
-            size = os.fstat(f.fileno()).st_size
-
-        else:
-            f = path_or_file
-            if hasattr(f, 'size'):
-                size = f.size
-
-            else:
-                size = os.fstat(f.fileno()).st_size
-
-        self._set_progress(0, size, 'Importing guide data...')
+        if not self.lock.acquire(False):
+            LOGGER.debug('Metadata fetch lock acquisition failed')
+            return
 
         try:
-            # Load the XML and get a reference to the root element.
-            parser = iterparse(f, events=('start', 'end'))
-            parser = iter(parser)
-            _, root = next(parser)
-            LOGGER.debug('XML root element: %s', root.tag)
+            LOGGER.info('Syncing guide data from XMLTV...')
 
-            channels, data = {}, {}
-            for event, el in parser:
-                if event == 'start':
-                    # LOGGER.debug('Start of XML element: %s', el.tag)
-                    if el.tag == 'channel':
-                        data['id'] = el.attrib['id']
+            if isinstance(path_or_file, str):
+                f = open(path_or_file, 'rb')
+                size = os.fstat(f.fileno()).st_size
 
-                    if el.tag == 'programme':
-                        data['start'] = _parse_time(el.attrib['start'])
-                        data['stop'] = _parse_time(el.attrib['stop'])
-                        # If the channel is not in our database, set to None,
-                        # later we will skip saving programs with:
-                        # channel == None.
-                        data['channel'] = channels.get(el.attrib['channel'])
-                    continue
-
-                # LOGGER.debug('End of XML element: %s', el.tag)
-
-                # There can be multiple elements. We want the one that contains
-                # both the number and name. That element can be split on space.
-                if el.tag == 'display-name':
-                    parts = el.text.split(' ')
-                    if len(parts) == 2:
-                        data['number'], data['name'] = parts
-                    continue
-
-                # Save Channel
-                elif el.tag == 'channel':
-                    channels[data['id']] = self._get_channel(**data)
-
-                # shared fields.
-                elif el.tag == 'icon':
-                    data['poster'] = el.attrib['src']
-                    continue
-
-                # programme fields.
-                elif el.tag == 'title':
-                    data['title'] = el.text
-                    continue
-
-                elif el.tag == 'desc':
-                    data['desc'] = el.text
-                    continue
-
-                elif el.tag == 'sub-title':
-                    data['desc'] = el.text
-                    continue
-
-                elif el.tag == 'actor':
-                    data.setdefault(
-                        'actors', []).append(self.get_person(el.text))
-                    continue
-
-                elif el.tag == 'length':
-                    unit = el.attrib['units']
-
-                    if unit == 'seconds':
-                        data['duration'] = int(el.text)
-                    elif unit == 'minutes':
-                        data['duration'] = int(el.text) * 60
-                    elif unit == 'hours':
-                        data['duration'] = int(el.text) * 60 * 60
-                    else:
-                        LOGGER.warning(
-                            'length unit: %s unrecognized', el.attrib['units'])
-                    continue
-
-                elif el.tag == 'category':
-                    data.setdefault(
-                        'categories', []).append(self._get_category(el.text))
-                    continue
-
-                elif el.tag == 'rating':
-                    data['rating'] = self._get_rating(el[0].text)
-                    continue
-
-                # Save Programme
-                elif el.tag == 'programme':
-                    if data['channel'] is None:
-                        continue
-
-                    # Calculate program length if not provided.
-                    if 'duration' not in data:
-                        data['duration'] = int(
-                            (data['stop'] - data['start']).total_seconds()
-                        )
-
-                    channel = data.pop('channel')
-                    start = data.pop('start')
-                    stop = data.pop('stop')
-                    actors = data.pop('actors', None)
-                    categories = data.pop('categories', None)
-
-                    try:
-                        with atomic(immediate=True):
-                            program, _ = \
-                                Program.objects.update_or_create(
-                                    channel=channel, start=start, stop=stop,
-                                    defaults=data)
-
-                            if actors is not None:
-                                for person in actors:
-                                    ProgramActor.objects.get_or_create(
-                                        program=program, person=person)
-
-                            if categories:
-                                program.categories.add(*categories)
-
-
-                    except IntegrityError as e:
-                        LOGGER.exception(
-                            'Schedule conflict: channel=%s, start=%s, stop=%s'
-                            ', data=%s', channel, start, stop, data)
-                        raise
+            else:
+                f = path_or_file
+                if hasattr(f, 'size'):
+                    size = f.size
 
                 else:
-                    continue
+                    size = os.fstat(f.fileno()).st_size
 
-                data.clear()
-                root.clear()
+            self._set_progress(0, size, 'Importing guide data...')
 
+            try:
+                # Load the XML and get a reference to the root element.
+                parser = iterparse(f, events=('start', 'end'))
+                parser = iter(parser)
+                _, root = next(parser)
+                LOGGER.debug('XML root element: %s', root.tag)
+
+                channels, data = {}, {}
+                for event, el in parser:
+                    if event == 'start':
+                        # LOGGER.debug('Start of XML element: %s', el.tag)
+                        if el.tag == 'channel':
+                            data['id'] = el.attrib['id']
+
+                        if el.tag == 'programme':
+                            data['start'] = _parse_time(el.attrib['start'])
+                            data['stop'] = _parse_time(el.attrib['stop'])
+                            # If the channel is not in our database, set to None,
+                            # later we will skip saving programs with:
+                            # channel == None.
+                            data['channel'] = channels.get(el.attrib['channel'])
+                        continue
+
+                    # LOGGER.debug('End of XML element: %s', el.tag)
+
+                    # There can be multiple elements. We want the one that contains
+                    # both the number and name. That element can be split on space.
+                    if el.tag == 'display-name':
+                        parts = el.text.split(' ')
+                        if len(parts) == 2:
+                            data['number'], data['name'] = parts
+                        continue
+
+                    # Save Channel
+                    elif el.tag == 'channel':
+                        channels[data['id']] = self._get_channel(**data)
+
+                    # shared fields.
+                    elif el.tag == 'icon':
+                        data['poster'] = el.attrib['src']
+                        continue
+
+                    # programme fields.
+                    elif el.tag == 'title':
+                        data['title'] = el.text
+                        continue
+
+                    elif el.tag == 'desc':
+                        data['desc'] = el.text
+                        continue
+
+                    elif el.tag == 'sub-title':
+                        data['desc'] = el.text
+                        continue
+
+                    elif el.tag == 'actor':
+                        data.setdefault(
+                            'actors', []).append(self.get_person(el.text))
+                        continue
+
+                    elif el.tag == 'length':
+                        unit = el.attrib['units']
+
+                        if unit == 'seconds':
+                            data['duration'] = int(el.text)
+                        elif unit == 'minutes':
+                            data['duration'] = int(el.text) * 60
+                        elif unit == 'hours':
+                            data['duration'] = int(el.text) * 60 * 60
+                        else:
+                            LOGGER.warning(
+                                'length unit: %s unrecognized', el.attrib['units'])
+                        continue
+
+                    elif el.tag == 'category':
+                        data.setdefault(
+                            'categories', []).append(self._get_category(el.text))
+                        continue
+
+                    elif el.tag == 'rating':
+                        data['rating'] = self._get_rating(el[0].text)
+                        continue
+
+                    # Save Programme
+                    elif el.tag == 'programme':
+                        if data['channel'] is None:
+                            continue
+
+                        # Calculate program length if not provided.
+                        if 'duration' not in data:
+                            data['duration'] = int(
+                                (data['stop'] - data['start']).total_seconds()
+                            )
+
+                        channel = data.pop('channel')
+                        start = data.pop('start')
+                        stop = data.pop('stop')
+                        actors = data.pop('actors', None)
+                        categories = data.pop('categories', None)
+
+                        try:
+                            with atomic(immediate=True):
+                                program, _ = \
+                                    Program.objects.update_or_create(
+                                        channel=channel, start=start, stop=stop,
+                                        defaults=data)
+
+                                if actors is not None:
+                                    for person in actors:
+                                        ProgramActor.objects.get_or_create(
+                                            program=program, person=person)
+
+                                if categories:
+                                    program.categories.add(*categories)
+
+
+                        except IntegrityError as e:
+                            LOGGER.exception(
+                                'Schedule conflict: channel=%s, start=%s, stop=%s'
+                                ', data=%s', channel, start, stop, data)
+                            raise
+
+                    else:
+                        continue
+
+                    data.clear()
+                    root.clear()
+
+                    self._set_progress(f.tell(), size)
+
+                # One final progress notification...
                 self._set_progress(f.tell(), size)
 
-            # One final progress notification...
-            self._set_progress(f.tell(), size)
+            finally:
+                f.close()
 
         finally:
-            f.close()
+            self.lock.release()
