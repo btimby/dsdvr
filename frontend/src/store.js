@@ -2,11 +2,26 @@ import axios from "axios";
 
 let refreshInProgress = false;
 
+// Some endpoints that don't require a token...
+const TOKEN_WHITELIST = [
+    '/api/token/',
+];
+
 axios.interceptors.request.use (
     function(config) {
         const token = localStorage.getItem('accessToken');
         if (token)
             config.headers.Authorization = `Bearer ${token}`;
+        // TODO: url may be absolute. We need to part the path out in that
+        // case. Currently we use all relative URLs so this works.
+        else if (TOKEN_WHITELIST.indexOf(config.url) == -1)
+        {
+            return {
+                // TODO: this causes an error in response interceptor.
+                ...config,
+                cancelToken: new CancelToken((cancel) => cancel('No token'))
+            };
+        }
         return config;
     },
     function(error) {
@@ -16,28 +31,42 @@ axios.interceptors.request.use (
 
 axios.interceptors.response.use(
     function(response) { return response;}, 
-    function(error) {
-        const { config, response: { status } } = error;
+    function(e) {
+        const { config, response: { status } } = e;
 
         if (status === 401 && !refreshInProgress) {
             let refreshToken = localStorage.getItem('refreshToken');
-            refreshInProgress = true;
+            if (!refreshToken) {
+                // No refresh token, just bail.
+                return Promise.reject(e);
+            }
 
+            refreshInProgress = true;
             axios.post('/api/token/refresh/', {
                 'refresh': refreshToken,
             })
                 .then(r => {
-                    const token = r.data.access;
-                    localStorage.setItem('accessToken', token);
-                    config.headers.Authorization = `Bearer ${token}`;
                     refreshInProgress = false;
+
+                    localStorage.setItem('accessToken', r.data.access);
+                    config.headers.Authorization = `Bearer ${r.data.access}`;
+
+                    // Retry with fresh token...
                     return axios.request(config);
                 })
                 .catch(e => {
                     refreshInProgress = false;
+
+                    const { config, response: { status } } = e;
+                    if (status == 400) {
+                        // Invalid / expired refresh token, delete tokens.
+                        localStorage.removeItem('accessToken');
+                        localStorage.removeItem('refreshToken');
+                    }
                 });
+
         } else {
-            return Promise.reject (error);
+            return Promise.reject(e);
         }
     }
 );
@@ -55,9 +84,47 @@ class Store {
             });
     }
 
+    getTuners() {
+        return axios.get('/api/tuners/');
+    }
+
+    discoverTuners(callback) {
+        axios.post('/api/tuners/discover/')
+            .then(r => {
+                this.pollTask(r.data, callback);
+            });
+    }
+
+    getGuide() {
+        return axios.get('/api/guide/');
+    }
+
+    downloadGuide(callback) {
+        axios.post('/api/guide/download/')
+            .then(r => {
+                this.pollTask(r.data, callback);
+            });
+    }
+
     getTasks() {
         // Get tasks from the API...
         return axios.get('/api/tasks/');
+    }
+
+    pollTask(task, callback) {
+        function poll() {
+            axios.get(`/api/tasks/${task.id}/`)
+                .then(r => {
+                    // If not complete, set another timeout...
+                    if (r.data.status == 'running') {
+                        setTimeout(poll, 1000);
+                    }
+
+                    callback(r);
+                });
+        }
+
+        setTimeout(poll, 1000);
     }
 
     deleteTask(taskId) {
