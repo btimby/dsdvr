@@ -9,8 +9,8 @@
       </v-toolbar-title>
       <v-spacer></v-spacer>
 
-      <RecordingButton/>
-      <TaskGear />
+      <RecordingStatus />
+      <TaskStatus />
 
     </v-toolbar>
 
@@ -54,8 +54,8 @@
 </template>
 
 <script>
-import TaskGear from '@/components/TaskGear'
-import RecordingButton from '@/components/RecordingButton'
+import TaskStatus from '@/components/TaskStatus'
+import RecordingStatus from '@/components/RecordingStatus'
 
 function getGravatar(email, size) {
 
@@ -89,8 +89,8 @@ export default {
   name: 'Toolbar',
 
   components: {
-    TaskGear,
-    RecordingButton,
+    TaskStatus,
+    RecordingStatus,
   },
 
   data() {

@@ -38,38 +38,29 @@
 
 <script>
   export default {
-    name: "RecordingButton",
+    name: "RecordingStatus",
 
     data() {
         return {
             local: {
                 recordings: [],
-                recordingInterval: null,
             },
             store: this.$store.state,
         }
     },
 
-    mounted() {
-        this.getRecordings();
-        this.local.recordingIterval = setInterval(this.getRecordings, 10000);
+    created() {
+        this.$store.status.subscribe(this.update);
     },
 
     beforeDestroy() {
-        clearInterval(this.local.recordingIterval);
+        this.$store.status.unsubscribe(this.update);
     },
 
     methods: {
-        getRecordings() {
-            // Don't fetch ajax data if a video is playing...
-            if (this.store.nowPlaying)
-                return;
-
-            this.$store.getRecordings()
-                .then(r => {
-                    this.local.recordings = r.data;
-                });
-        }
+        update(status) {
+            this.local.recordings = status.recordings;
+        },
     },
 
     computed: {

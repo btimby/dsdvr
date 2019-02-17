@@ -71,12 +71,73 @@ axios.interceptors.response.use(
     }
 );
 
+class Status {
+    constructor() {
+        this._subscribers = [];
+        this._interval = null;
+        this._status = null;
+    }
+
+    _dispatch(status) {
+        this._status = status;
+        this._subscribers.forEach(fn => {
+            try {
+                fn(this._status);
+
+            } catch(e) {
+                // Don't let their issues affect us.
+                console.log(e);
+            }
+        })
+    }
+
+    get() {
+        return axios.get('/api/status/');
+    }
+
+    _poll() {
+        this.get()
+            .then(r => {
+                // Simple quick comparison. Key order will match as API uses
+                // OrderedDict. Even if this fails, it just means some extra
+                // dispatches.
+                if (JSON.stringify(r.data) === 
+                    JSON.stringify(this._status))
+                    return;
+                this._dispatch(r.data);
+            });
+    }
+
+    subscribe(fn) {
+        this._subscribers.push(fn);
+        if (this._interval === null) {
+            // Get data for them right away.
+            this._poll();
+            // Poll every so often while we have subscribers.
+            this._interval = setInterval(this._poll.bind(this), 10000);
+        }
+    }
+
+    unsubscribe(fn) {
+        const index = this._subscribers.indexOf(fn);
+        if (index !== -1) {
+            this._subscribers.splice(index, 1);
+        }
+        if (this._subscribers.length === 0) {
+            // Don't poll if we don't have subscribers.
+            clearInterval(this._interval);
+            this._interval = null;
+        }
+    }
+}
+
 class Store {
     constructor() {
         this.state = { 
             nowPlaying: null,
             user: null,
         };
+        this.status = new Status();
 
         axios.get('/api/me/')
             .then(r => {

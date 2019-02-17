@@ -1,8 +1,10 @@
 import os
+import logging
 
 from datetime import datetime, timedelta
 from functools import wraps
 from os.path import getsize
+from os.path import join as pathjoin
 
 import psutil
 from psutil import NoSuchProcess, ZombieProcess, AccessDenied
@@ -25,6 +27,11 @@ from main import settings
 User = get_user_model()
 
 
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(logging.NullHandler())
+
+
 class throttle(object):
     """
     Decorator that prevents a function from being called more than once every
@@ -38,36 +45,41 @@ class throttle(object):
         self.throttle_period = timedelta(
             seconds=seconds, minutes=minutes, hours=hours
         )
-        self.time_of_last_call = datetime.min
-        self.last_result = None
+        self.cache = {}
 
     def __call__(self, fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             now = datetime.now()
-            time_since_last_call = now - self.time_of_last_call
+            cache_key = (tuple(map(str, sorted(args))),
+                         tuple(map(str, sorted(kwargs.items()))))
+            last_call, last_result = \
+                self.cache.get(cache_key, (datetime.min, None))
 
+            time_since_last_call = now - last_call
             if time_since_last_call > self.throttle_period:
-                self.time_of_last_call = now
-                self.last_result = fn(*args, **kwargs)
-            return self.last_result
+                last_result = fn(*args, **kwargs)
+                self.cache[cache_key] = (now, last_result)
+
+            return last_result
 
         return wrapper
 
 
 @throttle(minutes=5)
-def get_media_stats():
+def get_directory_stats(path):
+    LOGGER.debug(path)
     size, count = 0, 0
-    for root, _, files in os.walk(settings.STORAGE_MEDIA):
+    for root, _, files in os.walk(path):
         count += len(files)
         for f in files:
-            size += getsize(os.path.join(root, f))
+            size += getsize(pathjoin(root, f))
 
     stats = {
         'size': size,
         'count': count,
     }
-    return stats    
+    return stats
 
 
 @throttle(seconds=90)
@@ -109,7 +121,8 @@ def get_system_stats():
         Stream.objects.filter(pid__isnull=False).values_list('pid', flat=True)
     )
     stats = {
-        'media': get_media_stats(),
+        'media': get_directory_stats(settings.STORAGE_MEDIA),
+        'temp': get_directory_stats(settings.STORAGE_TEMP),
         'processes': get_process_stats(pids),
     }
     return stats

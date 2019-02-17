@@ -45,38 +45,29 @@
 // TODO: This component is very much like RecordingButton.vue, the can be consolidated.
 
   export default {
-    name: "TaskGear",
+    name: "TaskStatus",
 
     data() {
         return {
             local: {
                 tasks: [],
-                taskInterval: null
             },
             store: this.$store.state,
         }
     },
 
-    mounted() {
-        this.getTasks();
-        this.local.taskInterval = setInterval(this.getTasks, 10000);
+    created() {
+        this.$store.status.subscribe(this.update);
     },
 
     beforeDestroy() {
-        clearInterval(this.local.taskInterval);
+        this.$store.status.unsubscribe(this.update);
     },
 
     methods: {
-        getTasks() {
-            // Don't fetch ajax data if a video is playing...
-            if (this.store.nowPlaying)
-                return;
-
-            this.$store.getTasks()
-                .then(r => {
-                    this.local.tasks = r.data;
-                });
-        }
+        update(status) {
+            this.local.tasks = status.tasks;
+        },
     },
 
     computed: {
