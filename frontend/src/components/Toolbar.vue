@@ -121,16 +121,20 @@ export default {
     }
   },
 
+  props: [
+    'user',
+  ],
+
   methods: {
     logout() {
-      this.$store.logout();
-      this.$router.push('login');
+      this.$store.removeToken();
+      this.$emit('logout');
     }
   },
 
   computed: {
     account() {
-      const account = Object.assign({}, this.store.user);
+      const account = Object.assign({}, this.user);
       if (account.email) {
         account.icon = getGravatar(account.email);
       }

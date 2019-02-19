@@ -28,3 +28,4 @@ omdb = "*"
 djangorestframework-queryfields = "*"
 python-daemon = "*"
 pylast = "*"
+pysd = {git = "https://github.com/btimby/pysd.git"}

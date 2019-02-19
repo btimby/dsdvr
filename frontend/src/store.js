@@ -5,6 +5,7 @@ let refreshInProgress = false;
 // Some endpoints that don't require a token...
 const TOKEN_WHITELIST = [
     '/api/token/',
+    '/api/me/',
 ];
 
 axios.interceptors.request.use (
@@ -16,11 +17,7 @@ axios.interceptors.request.use (
         // case. Currently we use all relative URLs so this works.
         else if (TOKEN_WHITELIST.indexOf(config.url) == -1)
         {
-            return {
-                // TODO: this causes an error in response interceptor.
-                ...config,
-                cancelToken: new CancelToken((cancel) => cancel('No token'))
-            };
+            return Promise.reject('No token');
         }
         return config;
     },
@@ -135,14 +132,12 @@ class Store {
     constructor() {
         this.state = { 
             nowPlaying: null,
-            user: null,
         };
         this.status = new Status();
+    }
 
-        axios.get('/api/me/')
-            .then(r => {
-                this.state.user = r.data;
-            });
+    getUser() {
+        return axios.get('/api/me');
     }
 
     getTuners() {
@@ -230,7 +225,7 @@ class Store {
             `/api/media/${mediaId}/stream/`, { cursor: currentTime });
     }
 
-    login(email, password) {
+    getToken(email, password) {
         return axios.post('/api/token/', { email: email, password: password })
             .then(r => {
                 localStorage.setItem('accessToken', r.data.access);
@@ -244,7 +239,7 @@ class Store {
             });
     }
 
-    logout() {
+    removeToken() {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
     }

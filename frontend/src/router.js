@@ -5,7 +5,6 @@ import About from '@/views/About';
 import Guide from '@/views/Guide';
 import Recordings from '@/views/Recordings';
 import Media from '@/views/Media';
-import Login from '@/views/Login';
 
 Vue.use(Router)
 
@@ -36,10 +35,5 @@ export default new Router({
       name: 'media',
       component: Media
     },
-    {
-      path: '/login',
-      name: 'login',
-      component: Login
-    }
   ]
 })

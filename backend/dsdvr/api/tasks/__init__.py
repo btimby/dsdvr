@@ -22,6 +22,8 @@ from django.http import Http404
 from django.shortcuts import redirect
 from django.urls import reverse
 
+from main.schedule import TASK_QUEUE
+
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
@@ -55,6 +57,7 @@ class TaskTerminationException(BaseException):
     pass
 
 
+# TODO: move to main.
 class BaseTask(object):
     '''
     To implement a new Task, you must subclass this one and implement _run().
@@ -78,21 +81,15 @@ class BaseTask(object):
         self.remaining = 0
         self.exit = threading.Event()
 
-    def start(self, background=False):
-        '''
-        Starts the task and registers it with the global task list.
-        '''
-        # TODO: we may want to have a thread limit and queue to avoid many
-        # concurrent tasks.
-        self.thread = threading.Thread(target=self.run)
-        self.thread.daemon = True  # Let the thread die with us
-        self.thread.start()
-        self.created, self.status = datetime.utcnow(), STATUS_RUNNING
+    def enqueue(self, background=False):
+        TASK_QUEUE.put(self)
 
         if not background:
             TASKS[str(self.id)] = self
 
         return redirect(reverse('tasks-detail', kwargs={'pk': str(self.id)}))
+
+    start = enqueue
 
     def stop(self):
         '''

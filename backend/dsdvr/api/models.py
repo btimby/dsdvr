@@ -222,10 +222,9 @@ class User(AbstractBaseUser):
         return self.is_admin
 
 
-class Setting(UpdateMixin, CreatedModifiedModel):
+class Image(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=256)
-    value = models.CharField(max_length=256)
+    url = models.URLField(unique=True)
 
 
 class Device(UpdateMixin, CreatedModifiedModel):
@@ -266,7 +265,9 @@ class Channel(UpdateMixin, CreatedModifiedModel):
     number = models.CharField(max_length=8)
     name = models.CharField(max_length=8)
     stream = models.CharField(max_length=256, null=True)
-    poster = models.URLField(max_length=256, null=True)
+    images = models.ManyToManyField(Image, related_name='channels')
+    poster = models.ForeignKey(
+        Image, null=True, on_delete=models.SET_NULL, related_name='channel_posters')
     hd = models.BooleanField(default=False)
 
     def __str__(self):
@@ -309,8 +310,8 @@ class MediaManager(DefaultTypeManager):
             'subtitle': program.subtitle,
             'desc': program.desc,
             'duration': program.duration,
-            'poster': program.poster,
             'rating': program.rating,
+            'poster': program.poster,
         })
 
         # Generate a path for this program. It will be relative to the media
@@ -336,6 +337,7 @@ class MediaManager(DefaultTypeManager):
                 MediaActor.objects.get_or_create(
                     media=media, person=actor.person)
 
+            media.images.add(*program.images.all())
             media.categories.add(*program.categories.all())
 
         return media, created
@@ -357,7 +359,9 @@ class Media(UpdateMixin, CreatedModifiedModel):
     title = models.CharField(max_length=256)
     subtitle = models.CharField(max_length=256)
     desc = models.TextField()
-    poster = models.URLField(max_length=256, null=True)
+    images = models.ManyToManyField(Image, related_name='media')
+    poster = models.ForeignKey(
+        Image, null=True, on_delete=models.SET_NULL, related_name='media_posters')
     categories = models.ManyToManyField(Category, related_name='media')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
     year = models.SmallIntegerField(null=True)
@@ -455,7 +459,9 @@ class Program(UpdateMixin, CreatedModifiedModel):
     start = models.DateTimeField()
     stop = models.DateTimeField()
     duration = models.IntegerField()
-    poster = models.URLField(max_length=256, null=True)
+    images = models.ManyToManyField(Image, related_name='programs')
+    poster = models.ForeignKey(
+        Image, null=True, on_delete=models.SET_NULL, related_name='program_posters')
     previously_shown = models.BooleanField(default=True)
 
     def __str__(self):

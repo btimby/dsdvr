@@ -48,9 +48,9 @@ export default {
     methods: {
         login() {
             if (this.$refs.loginForm.validate()) {
-                this.$store.login(this.local.email, this.local.password)
+                this.$store.getToken(this.local.email, this.local.password)
                     .then(r => {
-                        this.$router.push('home');
+                        this.$emit('login')
                     })
             }
         }

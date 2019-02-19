@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny
 
 from django.contrib.auth import get_user_model
 
-from api.models import Recording, Stream
+from api.models import Recording, Stream, Tuner, Channel, Program
 from api.views.tasks import TASKS
 from api.serializers import (
     TaskSerializer, RecordingSerializer, StreamSerializer
@@ -87,7 +87,7 @@ def get_process_stats(pids):
         'uptime': 0,
         'count': len(pids),
         'cpu_percent': 0,
-        'cpu_times': {'user': 0, 'system': 0},
+        'cpu_usage': {'user': 0, 'system': 0},
         'mem_percent': 0.0,
         'mem_usage': 0,
     }
@@ -106,8 +106,8 @@ def get_process_stats(pids):
                 stats['mem_usage'] += process.memory_info().rss
 
                 user, system = process.cpu_times()[:2]
-                stats['cpu_times']['user'] += user
-                stats['cpu_times']['system'] += system
+                stats['cpu_usage']['user'] += user
+                stats['cpu_usage']['system'] += system
 
         except (NoSuchProcess, ZombieProcess, AccessDenied) as e:
             LOGGER.warning(e, exc_info=True)
@@ -135,8 +135,7 @@ def get_system_stats():
 
 
 class StatusSerializer(serializers.Serializer):
-    users = serializers.IntegerField()
-    configured = serializers.BooleanField()
+    config = serializers.JSONField()
     system = serializers.SerializerMethodField()
     tasks = serializers.SerializerMethodField()
     recordings = serializers.SerializerMethodField()
@@ -179,9 +178,13 @@ class StatusView(views.APIView):
 
     def get(self, request):
         status = {
-            'users': User.objects.all().count(),
             # For now, True, later check configuration for required keys.
-            'configured': True,
+            'config': {
+                'users': User.objects.count(),
+                'tuners': Tuner.objects.count(),
+                'channels': Channel.objects.count(),
+                'programs': Program.objects.count(),
+            },
         }
         serializer = StatusSerializer(status, context={'request': request})
         return Response(serializer.data)

@@ -82,7 +82,7 @@
                     return 'yellow';
                 } else {
                     return 'red';
-                }                
+                }
             } else if (this.errored.length) {
                 return 'yellow';
             } else {
