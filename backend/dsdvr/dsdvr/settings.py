@@ -95,6 +95,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': pathjoin(BASE_DIR, 'db.sqlite3'),
+        'OPTIONS': {
+            'timeout': 20,
+        },
     }
 }
 
@@ -192,7 +195,6 @@ LOGGING = {
 CRON = (
     ('*/5 * * * *', 'api.tasks.TaskCleanup'),
     ('* * * * *',   'api.tasks.recordings.TaskRecordingManager'),
-    ('*/15 * * * *',   'api.tasks.libraries.TaskLibraryScan'),
 )
 
 # Allow application configuration to be edited in admin.

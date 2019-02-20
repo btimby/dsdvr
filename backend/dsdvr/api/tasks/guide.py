@@ -9,7 +9,7 @@ from datetime import datetime
 from django.db.utils import IntegrityError
 from django.db.transaction import atomic
 
-from api.models import Channel, Rating, Category, Program
+from api.models import Channel, Rating, Category, Program, Person, ProgramActor
 from api.tasks import BaseTask
 
 
@@ -100,12 +100,12 @@ class TaskGuideImport(BaseTask):
         return rating
 
     @atomic(immediate=True)
-    def _get_actor(self, name):
+    def _get_person(self, name):
         actor = self.actors.get(name)
         if actor is None:
-            actor, _ = Actor.objects.get_or_create(name=name)
+            person, _ = Person.objects.get_or_create(name=name)
             # Cache
-            self.actors[name] = actor
+            self.actors[name] = person
         return actor
 
     @atomic(immediate=True)
@@ -196,7 +196,8 @@ class TaskGuideImport(BaseTask):
                     continue
 
                 elif el.tag == 'actor':
-                    data.setdefault('actors', []).append(self.get_actor(el.text))
+                    data.setdefault(
+                        'actors', []).append(self.get_person(el.text))
                     continue
 
                 elif el.tag == 'length':
@@ -211,13 +212,11 @@ class TaskGuideImport(BaseTask):
                     else:
                         LOGGER.warning(
                             'length unit: %s unrecognized', el.attrib['units'])
-
-                    # Anything else we will ignore, the length will be
-                    # calculated from start and stop.
                     continue
 
                 elif el.tag == 'category':
-                    data['category'] = self._get_category(el.text)
+                    data.setdefault(
+                        'categories', []).append(self._get_category(el.text))
                     continue
 
                 elif el.tag == 'rating':
@@ -239,16 +238,22 @@ class TaskGuideImport(BaseTask):
                     start = data.pop('start')
                     stop = data.pop('stop')
                     actors = data.pop('actors', None)
+                    categories = data.pop('categories', None)
 
                     try:
                         with atomic(immediate=True):
-                            program, created = \
+                            program, _ = \
                                 Program.objects.update_or_create(
                                     channel=channel, start=start, stop=stop,
                                     defaults=data)
-                        
-                            if actors:
-                                program.actors.add(*actors)
+
+                            if actors is not None:
+                                for person in actors:
+                                    ProgramActor.objects.get_or_create(
+                                        program=program, person=person)
+
+                            if categories:
+                                program.categories.add(*categories)
 
 
                     except IntegrityError as e:

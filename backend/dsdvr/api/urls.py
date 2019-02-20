@@ -11,19 +11,16 @@ from api.views.guide import GuideViewSet
 from api.views.guide import GuideUploadViewSet
 from api.views.streams import StreamViewSet
 from api.views.streams import playlist, segment
-from api.views.libraries import LibraryViewSet, LibraryScanView
+from api.views.libraries import LibraryViewSet
 from api.views.shows import ShowViewSet
 from api.views.channels import ChannelViewSet
 from api.views.devices import DeviceViewSet
-from api.views.actors import ActorViewSet
+from api.views.people import PersonViewSet
 from api.views.ratings import RatingViewSet
 from api.views.categories import CategoryViewSet
 from api.views.movies import MovieViewSet
-from api.views.music import MusicViewSet
 from api.views.programs import ProgramViewSet
 from api.views.media import MediaViewSet, MediaStreamViewSet, poster, frame0
-from api.views.artists import ArtistViewSet
-from api.views.albums import AlbumViewSet
 from api.views.series import SeriesViewSet
 
 
@@ -35,17 +32,14 @@ router.register('guide', GuideViewSet, base_name='guide')
 router.register('streams', StreamViewSet, base_name='streams')
 router.register('libraries', LibraryViewSet, base_name='libraries')
 router.register('shows', ShowViewSet, base_name='shows')
-router.register('music', MusicViewSet, base_name='music')
 router.register('movies', MovieViewSet, base_name='movies')
 router.register('channels', ChannelViewSet, base_name='channels')
 router.register('devices', DeviceViewSet, base_name='devices')
-router.register('actors', ActorViewSet, base_name='actors')
+router.register('people', PersonViewSet, base_name='people')
 router.register('ratings', RatingViewSet, base_name='ratings')
 router.register('categories', CategoryViewSet, base_name='categories')
 router.register('programs', ProgramViewSet, base_name='programs')
 router.register('media', MediaViewSet, base_name='media')
-router.register('artists', ArtistViewSet, base_name='artists')
-router.register('albums', AlbumViewSet, base_name='albums')
 router.register('series', SeriesViewSet, base_name='series')
 
 
@@ -70,9 +64,6 @@ urlpatterns = [
         'post': 'create',
         'delete': 'destroy',
     })),
-
-    # Standalone view that allows scanning a library for media.
-    path('libraries/<uuid:pk>/scan/', LibraryScanView.as_view()),
 
     path('media/<uuid:pk>/poster.jpg', poster, name='media-poster'),
     path('media/<uuid:pk>/frame0.jpg', frame0, name='media-frame0'),

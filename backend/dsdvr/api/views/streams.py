@@ -165,7 +165,7 @@ def _tails(process, paths):
             process.wait()
 
 
-def _daemonize(command, paths, pid_file):
+def _daemonize(command, paths, pid_file, workdir):
     '''
     Fork into background so our transcoding won't die with us.
     '''
@@ -173,7 +173,7 @@ def _daemonize(command, paths, pid_file):
             detach_process=True,
             pidfile=pid_file):
 
-        log_file_path = pathjoin(dirname(paths[0]), 'ffmpeg.stderr')
+        log_file_path = pathjoin(workdir, 'ffmpeg.stderr')
         
         with open(log_file_path, 'ab') as log_file:
             log_file.write(b'\n%s\n\n' % (' '.join(command)).encode('utf8'))
@@ -185,15 +185,16 @@ def _daemonize(command, paths, pid_file):
             _tails(process, paths)
 
 
-def _tail_to_ffmpeg(paths, command):
+def _tail_to_ffmpeg(paths, command, workdir=None):
     '''
     Spawn a command and send a number of files to it's stdin.
     '''
-    pid_file = Pidfile(pathjoin(dirname(paths[0]), 'ffmpeg.pid'))
+    workdir = workdir if workdir else dirname(paths[0])
+    pid_file = Pidfile(pathjoin(workdir, 'ffmpeg.pid'))
 
     # daemon kills the host process, so start an intermediary...
     p_tail = multiprocessing.Process(
-        target=_daemonize, args=(command, paths, pid_file))
+        target=_daemonize, args=(command, paths, pid_file, workdir))
     p_tail.daemon = False
     p_tail.start()
 
@@ -255,7 +256,7 @@ class CreatingStreamSerializer(StreamSerializer):
             'Piping %s to: "%s"', ','.join(file_names), " ".join(command))
 
         # The video file could be written to, use tail to follow the file.
-        pid = _tail_to_ffmpeg(file_names, command)
+        pid = _tail_to_ffmpeg(file_names, command, dirname(playlist))
         obj.update(pid=pid, path=temp)
 
         return obj

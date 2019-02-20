@@ -104,6 +104,8 @@
                 } else {
                     return 'red';
                 }                
+            } else if (this.errored.length) {
+                return 'yellow';
             }
             return 'grey';
         }

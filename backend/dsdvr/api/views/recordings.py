@@ -25,8 +25,10 @@ class RecordingViewSet(viewsets.ModelViewSet):
     def destroy(self, request, pk=None):
         recording = get_object_or_404(Recording, pk=pk)
 
-        # NOTE: we let this raise so we don't delete a recording that may
-        # reference a running process.
-        RecordingControl(recording)._stop_recording()
+        try:
+            RecordingControl(recording)._stop_recording()
+
+        except Exception as e:
+            LOGGER.exception(e)
 
         return super().destroy(request, pk=pk)

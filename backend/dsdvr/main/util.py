@@ -1,8 +1,9 @@
 import os
 import shutil
 import glob
+import tempfile
 
-from os.path import isfile, dirname, splitext, basename
+from os.path import dirname, splitext, basename
 from os.path import join as pathjoin
 
 
@@ -32,19 +33,28 @@ def get_recordings(path):
     return [pathjoin(path, nummap[i]) for i in numbers]
 
 
-def combine_recordings(dst_path, src_paths, delete=True):
+def combine_recordings(path, delete=True):
     '''
     Concatenate src_paths to dst_path. Optionally delete src_paths.
     '''
-    if not src_paths:
+    file_names = get_recordings(path)
+
+    if not file_names or len(file_names) == 1:
         return
 
-    for src_path in src_paths:
-        with open(dst_path, 'ab') as dst:
-            with open(src_path, 'rb') as src:
-                shutil.copyfileobj(src, dst)
+    dst_path, src_paths = file_names[0], file_names[1:]
+    if src_paths:
+        with tempfile.NamedTemporaryFile(
+                dir=dirname(dst_path), delete=False) as t:
+            for src_path in src_paths:
+                with open(src_path, 'rb') as src:
+                    shutil.copyfileobj(src, t)
 
-        if delete:
+        os.remove(dst_path)
+        os.rename(t.name, dst_path)
+
+    if delete:
+        for src_path in src_paths:
             os.remove(src_path)
 
 
@@ -75,3 +85,23 @@ def last_3_lines(data):
         data = data.read()
 
     return os.newline.join(data.splitlines()[-3:])
+
+
+def get_program_filename(program):
+    '''
+    Build a filesystem path for the given media item.
+    '''
+    title = program.title.replace(' ', '.')
+    airtime = program.start.strftime('%m-%d-%Y-%H:%M')
+    # unique = ''.join(
+    #     random.choices(string.ascii_letters + string.digits, k=6))
+    return pathjoin(title, airtime, 'recording0.mpeg')
+
+
+def parse_program_filename(path):
+    '''
+    The reverse of get_media_filename().
+    '''
+    title, airtime, _ = path.split('/')
+    title = title.replace('.', ' ')
+    return title, airtime

@@ -2,12 +2,11 @@ import os.path
 
 from django.shortcuts import get_object_or_404
 
-from rest_framework import serializers, viewsets, views
+from rest_framework import serializers, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import detail_route
 
 from api.models import Library
-from api.tasks.libraries import TaskLibraryScan
 from api.serializers import LibrarySerializer, MediaSerializer
 
 
@@ -26,9 +25,3 @@ class LibraryViewSet(viewsets.ModelViewSet):
         serializer = serializers.ListSerializer(
             library.media, child=MediaSerializer())
         return Response(serializer.data)
-
-
-class LibraryScanView(views.APIView):
-    def post(self, request, pk=None):
-        library = get_object_or_404(Library, pk=pk)
-        return TaskLibraryScan(args=(library,)).start()
