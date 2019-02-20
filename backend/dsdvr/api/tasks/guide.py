@@ -3,6 +3,8 @@ import pytz
 
 import os.path
 
+import pysd
+
 from xml.etree.cElementTree import iterparse
 from datetime import datetime
 
@@ -11,6 +13,8 @@ from django.db.transaction import atomic
 
 from api.models import Channel, Rating, Category, Program, Person, ProgramActor
 from api.tasks import BaseTask
+
+from main import settings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -157,16 +161,18 @@ class TaskGuideImport(BaseTask):
                     if el.tag == 'programme':
                         data['start'] = _parse_time(el.attrib['start'])
                         data['stop'] = _parse_time(el.attrib['stop'])
-                        # If the channel is not in our database, set to None,
-                        # later we will skip saving programs with:
+                        # If the channel is not in our database, set to
+                        # None, later we will skip saving programs with:
                         # channel == None.
-                        data['channel'] = channels.get(el.attrib['channel'])
+                        data['channel'] = \
+                            channels.get(el.attrib['channel'])
                     continue
 
                 # LOGGER.debug('End of XML element: %s', el.tag)
 
-                # There can be multiple elements. We want the one that contains
-                # both the number and name. That element can be split on space.
+                # There can be multiple elements. We want the one that
+                # contains both the number and name. That element can be
+                # split on space.
                 if el.tag == 'display-name':
                     parts = el.text.split(' ')
                     if len(parts) == 2:
@@ -255,7 +261,6 @@ class TaskGuideImport(BaseTask):
                             if categories:
                                 program.categories.add(*categories)
 
-
                     except IntegrityError as e:
                         LOGGER.exception(
                             'Schedule conflict: channel=%s, start=%s, stop=%s'
@@ -275,3 +280,18 @@ class TaskGuideImport(BaseTask):
 
         finally:
             f.close()
+
+
+class TaskGuideDownload(BaseTask):
+    def _run(self):
+        self._set_progress(0, 1, 'Downloading guide data...')
+
+        if settings.GUIDE_METHOD != 'automatic':
+            LOGGER.info('Automatic guide download disabled.')
+            return
+
+        if not settings.GUIDE_SD_USERNAME or not settings.GUIDE_SD_PASSWORD:
+            LOGGER.warning('Aborting, no schedules direct credentials.')
+            return
+
+        self._set_progress(1, 1, 'Guide data downloaded.')

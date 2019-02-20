@@ -38,63 +38,42 @@
 
 <script>
   export default {
-    name: "RecordingButton",
+    name: "RecordingStatus",
 
     data() {
         return {
             local: {
                 recordings: [],
-                recordingInterval: null,
             },
             store: this.$store.state,
         }
     },
 
-    mounted() {
-        this.getRecordings();
-        this.local.recordingIterval = setInterval(this.getRecordings, 10000);
+    created() {
+        this.$store.status.subscribe(this.update);
     },
 
     beforeDestroy() {
-        clearInterval(this.local.recordingIterval);
+        this.$store.status.unsubscribe(this.update);
     },
 
     methods: {
-        getRecordings() {
-            // Don't fetch ajax data if a video is playing...
-            if (this.store.nowPlaying)
-                return;
-
-            this.$store.getRecordings()
-                .then(r => {
-                    this.local.recordings = r.data;
-                });
-        }
+        update(status) {
+            this.local.recordings = status.recordings;
+        },
     },
 
     computed: {
         errored: function() {
-            const errored = [];
-
-            this.local.recordings.forEach((task) => {
-                if (task.status !== 'error')
-                    return;
-                errored.push(task);
-            });
-
-            return errored;
+            return this.local.recordings.filter(recording => {
+                return recording.status === 'error';
+            })
         },
 
         running: function() {
-            const running = [];
-
-            this.local.recordings.forEach((task) => {
-                if (task.status !== 'recording')
-                    return;
-                running.push(task);
+            return this.local.recordings.filter(recording => {
+                return recording.status === 'recording';
             });
-
-            return running;
         },
 
         color: function() {
@@ -103,11 +82,12 @@
                     return 'yellow';
                 } else {
                     return 'red';
-                }                
+                }
             } else if (this.errored.length) {
                 return 'yellow';
+            } else {
+                return 'grey';
             }
-            return 'grey';
         }
     },
   }

@@ -8,10 +8,10 @@ from ffmpeg._run import Error as FfmpegError
 from django.db.transaction import atomic
 
 from api.tasks import BaseTask
-from api.settings import OMDB_API_KEY
 from api.models import (
-    Library, Media, Series, Category, Rating, Episode, Person, MediaActor,
+    Media, Series, Category, Rating, Episode, Person, MediaActor,
 )
+from main.settings import OMDB_API_KEY
 
 
 LOGGER = logging.getLogger(__name__)
@@ -106,15 +106,14 @@ def omdb(media):
             actors.append(person)
 
     if info['type'] == 'series':
-        series, _ = Series.objects.get_or_create(
-            library=media.library, title=metadata['title'])
+        series, _ = Series.objects.get_or_create(title=metadata['title'])
         series.update(**metadata)
 
         # Guide data _may_ provide these at some point...
-        season = episode = None
-
-        Episode.objects.create(
-            show=media, series=series, season=season, episode=episode)
+        nseason = nepisode = None
+        episode, _ = Episode.objects.get_or_create(
+            show=media.subtype(), series=series)
+        episode.update(season=nseason, episode=nepisode)
 
         media.categories.add(*categories)
         for person in actors:
@@ -122,6 +121,9 @@ def omdb(media):
         series.categories.add(*categories)
         for person in actors:
             MediaActor.objects.get_or_create(media=series, person=person)
+
+        # The OMDB poster is typically of higher quality...
+        media.update(poster=metadata['poster'])
 
     else:
         media.update(**metadata)
@@ -135,29 +137,9 @@ def omdb(media):
 
 class TaskMetadataFetch(BaseTask):
     '''
-    Fetch metadata for a media item or library.
+    Fetch metadata for a media item.
     '''
 
-    lock = threading.Lock()
-
-    def _get_metadata(self, media):
+    def _run(self, media):
         ffprobe(media)
         omdb(media)
-
-    def _run(self, obj):
-        if not self.lock.acquire(False):
-            LOGGER.debug('Metadata fetch lock acquisition failed')
-            return
-
-        try:
-            if isinstance(obj, Library):
-                queryset = Media.objects.filter(library=library)
-
-            else:
-                queryset = Media.objects.filter(pk=obj.pk)
-
-            for media in queryset:
-                self._get_metadata(media)
-
-        finally:
-            self.lock.release()

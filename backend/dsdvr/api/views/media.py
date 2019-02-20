@@ -16,7 +16,9 @@ from rest_framework.response import Response
 
 from api.models import Media, Stream
 from api.serializers import MediaSerializer, StreamSerializer
-from api.views.streams import CreatingStreamSerializer
+from api.views.streams import (
+    CreatingStreamSerializer, validate_stream, InvalidStreamError
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -53,10 +55,13 @@ class MediaStreamViewSet(viewsets.ModelViewSet):
     def create(self, request, pk=None):
         media = get_object_or_404(Media, pk=pk)
         try:
+            # Raises InvalidStreamError if the stream is not playable.
+            validate_stream(media.stream)
+
             serializer = StreamSerializer(
                 media.stream, context={'request': request})
 
-        except Stream.DoesNotExist:
+        except (InvalidStreamError, Stream.DoesNotExist):
 
             data = {
                 'media': pk,

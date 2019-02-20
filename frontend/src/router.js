@@ -1,10 +1,10 @@
-import Vue from 'vue'
-import Router from 'vue-router'
-import Home from './views/Home'
-import About from './views/About'
-import Guide from './views/Guide'
-import Recordings from './views/Recordings'
-import Library from './views/Library'
+import Vue from 'vue';
+import Router from 'vue-router';
+import Home from '@/views/Home';
+import About from '@/views/About';
+import Guide from '@/views/Guide';
+import Recordings from '@/views/Recordings';
+import Media from '@/views/Media';
 
 Vue.use(Router)
 
@@ -31,9 +31,9 @@ export default new Router({
       component: Recordings
     },
     {
-      path: '/library/:id',
-      name: 'library',
-      component: Library
-    }
+      path: '/media',
+      name: 'media',
+      component: Media
+    },
   ]
 })

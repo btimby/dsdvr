@@ -5,10 +5,11 @@ import threading
 import fcntl
 import errno
 import tempfile
+import queue
 
 from os.path import join as pathjoin
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import psutil
 from croniter import croniter
@@ -24,6 +25,8 @@ LOGGER.addHandler(logging.NullHandler())
 SCHEDULE = {}
 SCHEDULER = None
 SCHEDULER_LOCK = 'dsdvr.lock'
+TASK_QUEUE = queue.Queue()
+TASK_THREADPOOL = []
 
 
 class Cron(object):
@@ -52,6 +55,36 @@ def _is_parent_python():
     return pprocess.name() == 'python'
 
 
+def _check_schedule():
+    '''
+    Runs each minute in order to execute any due Tasks.
+    '''
+    first = True
+
+    def _inner():
+        for cron, task_class in SCHEDULE.items():
+            # On the first iteration, run all tasks.
+            if first:
+                LOGGER.info('Running startup task...')
+
+            elif not cron.is_due():
+                continue
+
+            LOGGER.info('Running task %s', task_class)
+            task_class = import_string(task_class)
+            task_class().enqueue()
+
+    while True:
+        try:
+            _inner()
+
+        except Exception as e:
+            LOGGER.exception(e)
+
+        first = False
+        time.sleep(60)
+
+
 def _start_scheduler():
     # Django runserver forks. We don't want our scheduler running in the parent
     # since it survives auto-restart. This is a temporary workaround...
@@ -76,35 +109,21 @@ def _start_scheduler():
     SCHEDULER.start()
 
 
-def _check_schedule():
-    '''
-    Runs each minute in order to execute any due Tasks.
-    '''
-    first = True
+def _start_threadpool():
+    def _worker():
+        while True:
+            LOGGER.debug('Wating for task...')
+            task = TASK_QUEUE.get()
+            LOGGER.debug('Got task: %s', task.__class__.__name__)
+            task.run()
 
-    def _inner():
-        for cron, task_class in SCHEDULE.items():
-            # On the first iteration, run anything that runs every minute. This
-            # allows such tasks to run "at startup".
-            if first and cron.is_every_minute():
-                LOGGER.info('Running startup task...')
-
-            elif not cron.is_due():
-                continue
-
-            LOGGER.info('Running task %s', task_class)
-            task_class = import_string(task_class)
-            task_class().start(background=True)
-
-    while True:
-        try:
-            _inner()
-
-        except Exception as e:
-            LOGGER.exception(e)
-
-        first = False
-        time.sleep(60)
+    # TODO: configure thread pool size?
+    LOGGER.debug('Starting thread pool')
+    for _ in range(2):
+        worker = threading.Thread(target=_worker)
+        worker.daemon = True
+        worker.start()
+        TASK_THREADPOOL.append(worker)
 
 
 def setup(config):
@@ -132,3 +151,4 @@ def setup(config):
                 '"%s" is an invalid module_name.Class. %s' % (task_class, e))
 
     _start_scheduler()
+    _start_threadpool()

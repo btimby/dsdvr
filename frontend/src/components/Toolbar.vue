@@ -9,8 +9,8 @@
       </v-toolbar-title>
       <v-spacer></v-spacer>
 
-      <RecordingButton/>
-      <TaskGear />
+      <RecordingStatus />
+      <TaskStatus />
 
     </v-toolbar>
 
@@ -24,11 +24,16 @@
           <v-list-tile-content>
             <v-list-tile-title :title="account.email">{{ account.name }}</v-list-tile-title>
           </v-list-tile-content>
+
+          <v-btn small @click="logout">
+            Logout
+            <v-icon right>exit_to_app</v-icon>
+          </v-btn>
         </v-list-tile>
 
         <v-divider></v-divider>
 
-        <div v-for="item in menu" :key="item.id">
+        <div v-for="item in local.menu" :key="item.id">
           <v-subheader v-if="item.heading">{{ item.heading }}</v-subheader>
           <v-divider v-if="item.heading"></v-divider>
 
@@ -49,8 +54,8 @@
 </template>
 
 <script>
-import TaskGear from '@/components/TaskGear'
-import RecordingButton from '@/components/RecordingButton'
+import TaskStatus from '@/components/TaskStatus'
+import RecordingStatus from '@/components/RecordingStatus'
 
 function getGravatar(email, size) {
 
@@ -84,14 +89,13 @@ export default {
   name: 'Toolbar',
 
   components: {
-    TaskGear,
-    RecordingButton,
+    TaskStatus,
+    RecordingStatus,
   },
 
   data() {
     return {
       local: {
-        libraries: [],
         drawer: null,
         menu: [
           {
@@ -100,9 +104,16 @@ export default {
               { id: 'home', icon: 'dashboard', title: 'Home', route: '/'},
               { id: 'about', icon: 'subject', title: 'About', route: '/about'},
               { id: 'guide', icon: 'line_style', title: 'Guide', route: '/guide'},
-              { id: 'recordings', icon: 'save_alt', title: 'Recordings', route: '/recordings'},
             ]
-          }
+          },
+          {
+            id: 'library',
+            heading: 'Library',
+            items: [
+              { id: 'recordings', icon: 'save_alt', title: 'Recordings', route: '/recordings'},
+              { id: 'media', icon: 'theaters', title: 'Media', route: '/media'},
+            ]
+          },
         ]
       },
 
@@ -110,38 +121,25 @@ export default {
     }
   },
 
-  computed: {
-    menu() {
-      // Build a menu consisting of our static items and libraries...
-      const menu = [...this.local.menu];
-      const libraries = [];
+  props: [
+    'user',
+  ],
 
-      this.local.libraries.forEach(library => {
-        libraries.push({
-          id: library.id,
-          title: library.name,
-          icon: 'theaters',
-          route: `/library/${library.id}/`
-        });
-      });
-
-      menu.push({ id: 'libraries', heading: 'Libraries', items: libraries });
-
-      return menu;
-    },
-
-    account() {
-      const account = Object.assign({}, this.store.user);
-      account.icon = getGravatar(account.email);
-      return account;
+  methods: {
+    logout() {
+      this.$store.removeToken();
+      this.$emit('logout');
     }
   },
 
-  mounted() {
-    this.$store.getLibraries()
-      .then(r => {
-        this.local.libraries = r.data;
-      });
-  }
+  computed: {
+    account() {
+      const account = Object.assign({}, this.user);
+      if (account.email) {
+        account.icon = getGravatar(account.email);
+      }
+      return account;
+    }
+  },
 }
 </script>

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1>Library: {{ local.library.name }}</h1>
+    <h1>Media</h1>
 
     <v-container fluid grid-list-md>
         <!-- TODO: don't need a v-data-iterator here, could do with grid //-->
@@ -44,8 +44,8 @@
                 <v-list-tile-content class="align-end">{{ props.item.rating }}</v-list-tile-content>
                 </v-list-tile>
                 <v-list-tile>
-                <v-list-tile-content>Category:</v-list-tile-content>
-                <v-list-tile-content class="align-end">{{ props.item.category }}</v-list-tile-content>
+                <v-list-tile-content>Type:</v-list-tile-content>
+                <v-list-tile-content class="align-end">{{ props.item.type }}</v-list-tile-content>
                 </v-list-tile>
             </v-list>
             </v-card>
@@ -58,7 +58,7 @@
 
 <script>
 export default {
-    name: 'Library',
+    name: 'Media',
 
     data() {
         return {
@@ -66,7 +66,6 @@ export default {
                 pagination: {
                     rowsPerPage: -1,
                 },
-                library: {},
                 media: [],
             },
             store: this.$store.state,
@@ -84,11 +83,9 @@ export default {
 
     methods: {
         getData(libraryId) {
-            this.$store.getLibrary(libraryId, { media: true})
+            this.$store.getMedia()
                 .then(r => {
-                    this.local.media = r.data.media;
-                    delete r.data.media;
-                    this.local.library = r.data;
+                    this.local.media = r.data;
                     this.local.pagination.totalItems = this.local.media.length;
                 });
         },

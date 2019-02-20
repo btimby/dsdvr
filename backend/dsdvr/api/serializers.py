@@ -12,8 +12,8 @@ from rest_framework import serializers
 from drf_queryfields import QueryFieldsMixin
 
 from api.models import (
-    Show, Recording, Program, Channel, Library, Tuner, Device, Rating,
-    Category, Movie, Stream, Media, Series, Person, DeviceCursor
+    Show, Recording, Program, Channel, Tuner, Device, Rating, Category, Movie,
+    Stream, Media, Series, Person, DeviceCursor, User, Image,
 )
 from api.tasks import STATUS_NAMES
 from api.tasks.recordings import TaskRecordingManager
@@ -56,12 +56,11 @@ class ProgramRelatedField(serializers.ModelSerializer):
 class MediaRelatedField(serializers.ModelSerializer):
     class Meta:
         model = Media
-        fields = ('id', 'type', 'library', 'path', 'title', 'duration',
+        fields = ('id', 'type', 'path', 'title', 'duration',
                   'poster', 'category', 'rating')
-        read_only_fields = ('type', 'library', 'path', 'title', 'duration',
+        read_only_fields = ('type', 'path', 'title', 'duration',
                             'poster', 'category', 'rating')
 
-    library = serializers.StringRelatedField(read_only=True)
     category = serializers.SlugRelatedField(
         read_only=True, slug_field='name')
     rating = serializers.SlugRelatedField(
@@ -74,7 +73,6 @@ class ShowSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('id', 'path')
 
-    library = serializers.SlugRelatedField(read_only=True, slug_field='name')
     rating = serializers.SlugRelatedField(read_only=True, slug_field='name')
     category = serializers.SlugRelatedField(read_only=True, slug_field='name')
     type = DisplayChoiceField(
@@ -91,7 +89,6 @@ class MovieSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('id', 'path')
 
-    library = serializers.SlugRelatedField(read_only=True, slug_field='name')
     rating = serializers.SlugRelatedField(read_only=True, slug_field='name')
     category = serializers.SlugRelatedField(read_only=True, slug_field='name')
     type = DisplayChoiceField(
@@ -108,7 +105,6 @@ class SeriesSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('id', 'path')
 
-    library = serializers.SlugRelatedField(read_only=True, slug_field='name')
     rating = serializers.SlugRelatedField(read_only=True, slug_field='name')
     category = serializers.SlugRelatedField(read_only=True, slug_field='name')
     type = DisplayChoiceField(
@@ -276,24 +272,6 @@ class MediaSerializer(serializers.ModelSerializer):
         return serializer_class(getattr(data, attrname)).data
 
 
-class LibrarySerializer(QueryFieldsMixin, serializers.ModelSerializer):
-    class Meta:
-        model = Library
-        fields = '__all__'
-        read_only_fields = ('id',)
-
-    type = DisplayChoiceField(choices=list(Library.TYPE_NAMES.items()))
-    media = serializers.ListSerializer(read_only=True, child=MediaSerializer())
-
-
-class MediaRelatedField(serializers.ModelSerializer):
-    class Meta:
-        model = Media
-        fields = ('id', 'library')
-
-    library = serializers.SlugRelatedField(read_only=True, slug_field='name')
-
-
 class GuideUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
 
@@ -423,3 +401,28 @@ class SeriesSerializer(serializers.ModelSerializer):
         model = Series
         fields = '__all__'
         read_only_fields = ('id',)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'name')
+        read_only_fields = ('id', 'email')
+
+
+class ChannelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Channel
+        fields = '__all__'
+        read_only_fields = ('id',)
+
+    programs = serializers.SerializerMethodField()
+
+    def get_programs(self, obj):
+        return Program.objects.filter(channel=obj).count()
+
+
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = '__all__'

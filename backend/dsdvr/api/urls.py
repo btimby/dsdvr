@@ -11,7 +11,6 @@ from api.views.guide import GuideViewSet
 from api.views.guide import GuideUploadViewSet
 from api.views.streams import StreamViewSet
 from api.views.streams import playlist, segment
-from api.views.libraries import LibraryViewSet
 from api.views.shows import ShowViewSet
 from api.views.channels import ChannelViewSet
 from api.views.devices import DeviceViewSet
@@ -22,6 +21,9 @@ from api.views.movies import MovieViewSet
 from api.views.programs import ProgramViewSet
 from api.views.media import MediaViewSet, MediaStreamViewSet, poster, frame0
 from api.views.series import SeriesViewSet
+from api.views.me import MeView
+from api.views.status import StatusView
+from api.views.images import ImageViewSet, image
 
 
 router = DefaultRouter()
@@ -30,7 +32,6 @@ router.register('tuners', TunerViewSet, base_name='tuners')
 router.register('recordings', RecordingViewSet, base_name='recordings')
 router.register('guide', GuideViewSet, base_name='guide')
 router.register('streams', StreamViewSet, base_name='streams')
-router.register('libraries', LibraryViewSet, base_name='libraries')
 router.register('shows', ShowViewSet, base_name='shows')
 router.register('movies', MovieViewSet, base_name='movies')
 router.register('channels', ChannelViewSet, base_name='channels')
@@ -41,6 +42,7 @@ router.register('categories', CategoryViewSet, base_name='categories')
 router.register('programs', ProgramViewSet, base_name='programs')
 router.register('media', MediaViewSet, base_name='media')
 router.register('series', SeriesViewSet, base_name='series')
+router.register('images', ImageViewSet, base_name='images')
 
 
 urlpatterns = [
@@ -49,7 +51,8 @@ urlpatterns = [
          name='streams-playlist'),
     # NOTE: slug is import here. It prevents path traversal chars, yet allows
     # the chars we expect to see as segment file names.
-    path('streams/<uuid:pk>/hls/<slug:name>.ts', segment, name='streams-segment'),
+    path('streams/<uuid:pk>/hls/<slug:name>.ts', segment,
+         name='streams-segment'),
 
     # Standalone viewset that allows file upload and starts the import task.
     path('guide/upload/', GuideUploadViewSet.as_view({'post': 'create'})),
@@ -68,12 +71,18 @@ urlpatterns = [
     path('media/<uuid:pk>/poster.jpg', poster, name='media-poster'),
     path('media/<uuid:pk>/frame0.jpg', frame0, name='media-frame0'),
 
+    path('status/', StatusView.as_view(), name='status'),
+
     # Authentication
     path(
-        'api/token/', simplejwt.TokenObtainPairView.as_view(),
+        'token/', simplejwt.TokenObtainPairView.as_view(),
         name='token_obtain_pair'),
     path(
-        'api/token/refresh/', simplejwt.TokenRefreshView.as_view(),
+        'token/refresh/', simplejwt.TokenRefreshView.as_view(),
         name='token_refresh'),
+
+    path('me/', MeView.as_view(), name='me'),
+
+    path('images/<uuid:pk>/image.jpg', image, name='images-view'),
 
 ] + router.urls

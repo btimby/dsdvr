@@ -15,6 +15,9 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+
+from main import settings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -59,11 +62,10 @@ class BasePathField(models.CharField):
     def pre_save(self, model_instance, add):
         path = getattr(model_instance, self.attname)
         abs_path = self.absolute(model_instance)
-        base_path = self.basepath(model_instance)
 
         # Ensure the path is relative.
-        if base_path is not None and path.startswith(base_path):
-            path = relpath(path, base_path)
+        if self.relative_to is not None and path.startswith(self.relative_to):
+            path = relpath(path, self.relative_to)
 
         if not self.null:
             if self.auto_create:
@@ -74,17 +76,11 @@ class BasePathField(models.CharField):
 
         return path
 
-    def basepath(self, model_instance):
-        if self.relative_to is not None:
-            objname, _, attname = self.relative_to.partition('.')
-            return getattr(getattr(model_instance, objname), attname)
-
     def absolute(self, model_instance):
         path = getattr(model_instance, self.attname)
 
         if self.relative_to is not None:
-            base = self.basepath(model_instance)
-            path = pathjoin(base, path)
+            path = pathjoin(self.relative_to, path)
 
         return path
 
@@ -119,7 +115,8 @@ class FilePathField(BasePathField):
             if parent:
                 os.makedirs(parent, exist_ok=True)
 
-        pathlib.Path(path).touch(exist_ok=True)
+        if self.auto_create:
+            pathlib.Path(path).touch(exist_ok=True)
 
     def pre_save(self, model_instance, add):
         path = super().pre_save(model_instance, add)
@@ -174,10 +171,60 @@ class DefaultTypeManager(models.Manager):
             default_type=self.DEFAULT_TYPE)
 
 
-class Setting(UpdateMixin, CreatedModifiedModel):
+class UserManager(BaseUserManager):
+    def create_user(self, email, name, password=None):
+        """
+        Creates and saves a User with the given email, date of
+        birth and password.
+        """
+        if not email:
+            raise ValueError('Users must have an email address')
+
+        user = self.model(email=self.normalize_email(email), name=name)
+
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, name, password):
+        """
+        Creates and saves a superuser with the given email, date of
+        birth and password.
+        """
+        user = self.create_user(
+            email,
+            name,
+            password=password,
+        )
+        user.is_admin = True
+        user.save(using=self._db)
+        return user
+
+
+class User(AbstractBaseUser):
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['name']
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=256)
-    value = models.CharField(max_length=256)
+    email = models.EmailField(
+        verbose_name='email address',
+        max_length=255,
+        unique=True,
+    )
+    name = models.CharField(max_length=255, verbose_name='name')
+    is_active = models.BooleanField(default=True)
+    is_admin = models.BooleanField(default=False)
+
+    objects = UserManager()
+
+    @property
+    def is_staff(self):
+        return self.is_admin
+
+
+class Image(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    url = models.URLField(unique=True)
 
 
 class Device(UpdateMixin, CreatedModifiedModel):
@@ -218,7 +265,9 @@ class Channel(UpdateMixin, CreatedModifiedModel):
     number = models.CharField(max_length=8)
     name = models.CharField(max_length=8)
     stream = models.CharField(max_length=256, null=True)
-    poster = models.URLField(max_length=256, null=True)
+    images = models.ManyToManyField(Image, related_name='channels')
+    poster = models.ForeignKey(
+        Image, null=True, on_delete=models.SET_NULL, related_name='channel_posters')
     hd = models.BooleanField(default=False)
 
     def __str__(self):
@@ -226,27 +275,6 @@ class Channel(UpdateMixin, CreatedModifiedModel):
 
     def __repr__(self):
         return 'Channel: %s' % str(self)
-
-
-class Library(UpdateMixin, CreatedModifiedModel):
-    TYPE_MOVIES = 0
-    TYPE_SHOWS = 1
-    TYPE_MUSIC = 2
-
-    TYPE_NAMES = {
-        TYPE_MOVIES: 'movies',
-        TYPE_SHOWS: 'shows',
-        TYPE_MUSIC: 'music',
-    }
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.SmallIntegerField(choices=list(TYPE_NAMES.items()))
-    name = models.CharField(max_length=32, unique=True)
-    path = DirectoryPathField(unique=True, must_exist=True, auto_create=True)
-
-    @property
-    def abs_path(self):
-        return self.path
 
 
 class Person(models.Model):
@@ -282,12 +310,12 @@ class MediaManager(DefaultTypeManager):
             'subtitle': program.subtitle,
             'desc': program.desc,
             'duration': program.duration,
-            'poster': program.poster,
             'rating': program.rating,
+            'poster': program.poster,
         })
 
-        # Generate a path for this program. It will be relative to it's library
-        # root.
+        # Generate a path for this program. It will be relative to the media
+        # path.
         if 'path' not in defaults:
             defaults['path'] = _get_program_filename(program)
 
@@ -309,6 +337,7 @@ class MediaManager(DefaultTypeManager):
                 MediaActor.objects.get_or_create(
                     media=media, person=actor.person)
 
+            media.images.add(*program.images.all())
             media.categories.add(*program.categories.all())
 
         return media, created
@@ -330,17 +359,17 @@ class Media(UpdateMixin, CreatedModifiedModel):
     title = models.CharField(max_length=256)
     subtitle = models.CharField(max_length=256)
     desc = models.TextField()
-    poster = models.URLField(max_length=256, null=True)
+    images = models.ManyToManyField(Image, related_name='media')
+    poster = models.ForeignKey(
+        Image, null=True, on_delete=models.SET_NULL, related_name='media_posters')
     categories = models.ManyToManyField(Category, related_name='media')
     rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
     year = models.SmallIntegerField(null=True)
-    library = models.ForeignKey(
-        Library, on_delete=models.CASCADE, related_name='media')
     actors = models.ManyToManyField(Person, through='MediaActor')
 
     objects = MediaManager()
 
-    def type_model(self):
+    def subtype_model(self):
         if self.type == Media.TYPE_MOVIE:
             return Movie
 
@@ -354,7 +383,7 @@ class Media(UpdateMixin, CreatedModifiedModel):
             raise ValueError(
                 'Unsupported media type %s', Media.TYPE_NAMES[self.type])
 
-    def type_instance(self):
+    def subtype(self):
         if self.type == Media.TYPE_MOVIE:
             return self.movie
 
@@ -370,7 +399,7 @@ class Media(UpdateMixin, CreatedModifiedModel):
 
     @cached_property
     def abs_path(self):
-        return self.type_instance().abs_path
+        return self.subtype().abs_path
 
     @cached_property
     def frame0_path(self):
@@ -383,6 +412,9 @@ class SeriesManager(DefaultTypeManager):
 
 class Series(Media):
     objects = SeriesManager()
+
+    def subtype(self):
+        return self
 
 
 class ProgramManager(models.Manager):
@@ -427,7 +459,9 @@ class Program(UpdateMixin, CreatedModifiedModel):
     start = models.DateTimeField()
     stop = models.DateTimeField()
     duration = models.IntegerField()
-    poster = models.URLField(max_length=256, null=True)
+    images = models.ManyToManyField(Image, related_name='programs')
+    poster = models.ForeignKey(
+        Image, null=True, on_delete=models.SET_NULL, related_name='program_posters')
     previously_shown = models.BooleanField(default=True)
 
     def __str__(self):
@@ -443,9 +477,9 @@ class ShowManager(DefaultTypeManager):
     DEFAULT_TYPE = Media.TYPE_SHOW
 
 
-class Episode(models.Model):
+class Episode(UpdateMixin, models.Model):
     series = models.ForeignKey(Series, on_delete=models.CASCADE)
-    show = models.ForeignKey('Show', on_delete=models.CASCADE, unique=True)
+    show = models.OneToOneField('Show', on_delete=models.CASCADE)
     season = models.PositiveSmallIntegerField(null=True)
     episode = models.PositiveSmallIntegerField(null=True)
 
@@ -464,7 +498,7 @@ class Show(Media):
     play_count = models.IntegerField(default=0)
     path = FilePathField(
         max_length=256, must_exist=False, auto_create_parent=True,
-        auto_create=False, relative_to='library.path')
+        auto_create=False, relative_to=settings.STORAGE_MEDIA)
 
     def __str__(self):
         return self.program.title
@@ -475,6 +509,9 @@ class Show(Media):
     @cached_property
     def abs_path(self):
         return self._meta.get_field('path').absolute(self)
+
+    def subtype(self):
+        return self
 
     objects = ShowManager()
 
@@ -589,10 +626,13 @@ class Movie(Media):
     play_count = models.IntegerField(default=0)
     path = FilePathField(
         max_length=256, must_exist=False, auto_create_parent=True,
-        auto_create=False, relative_to='library.path')
+        auto_create=False, relative_to=settings.STORAGE_MEDIA)
 
     objects = MovieManager()
 
     @cached_property
     def abs_path(self):
         return self._meta.get_field('path').absolute(self)
+
+    def subtype(self):
+        return self

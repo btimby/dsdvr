@@ -39,7 +39,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    # 'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -168,8 +168,8 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'console': {
-            # exact format is not important, this is the minimum information
-            'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+            'format': '%(asctime)s [%(process)s:%(threadName).8s] '
+                      '%(name)-12.12s %(levelname)-8s %(message)s',
         },
     },
     'handlers': {
@@ -195,10 +195,11 @@ LOGGING = {
 CRON = (
     ('*/5 * * * *', 'api.tasks.TaskCleanup'),
     ('* * * * *',   'api.tasks.recordings.TaskRecordingManager'),
+    ('* * */8 * *',   'api.tasks.guide.TaskGuideDownload'),
 )
 
 # Allow application configuration to be edited in admin.
-SITEPREFS_EXPOSE_MODEL_TO_ADMIN = True
+SITEPREFS_EXPOSE_MODEL_TO_ADMIN = False
 
 WEBPACK_LOADER = {
     'DEFAULT': {
@@ -208,8 +209,13 @@ WEBPACK_LOADER = {
     }
 }
 
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': [
-#         'rest_framework_simplejwt.authentication.JWTAuthentication',
-#     ],
-# }
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    )
+}
+
+AUTH_USER_MODEL = 'api.User'

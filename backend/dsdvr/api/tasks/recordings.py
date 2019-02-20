@@ -1,3 +1,4 @@
+import os
 import logging
 import threading
 import subprocess
@@ -17,7 +18,7 @@ import daemon
 from django.utils import timezone
 from django.db.transaction import atomic
 
-from api.models import Recording, Library, Media
+from api.models import Recording, Media
 from api.tasks import BaseTask, metadata
 
 
@@ -47,9 +48,6 @@ def _tail(command, path):
                     written += len(data)
                     output.write(data)
 
-            else:
-                time.sleep(0.1)
-
     LOGGER.info(
         'Recording process exited with: %i after writing %i bytes',
         process.poll(), written)
@@ -71,13 +69,11 @@ class RecordingControl(object):
         # TODO: Setup wizard or similar must make user configure a library for
         # recordings... Perhaps we use a sane default? Can't think of one...
         # In any case, the first Library may not be the right one.
-        library = Library.objects.order_by('created').first()
-
-        if library is None:
-            raise RuntimeError('No library for recordings')
-
         media, _ = Media.objects.get_or_create_from_program(
-            self.recording.program, library=library)
+            self.recording.program)
+
+        # Just to be safe, this is our working dir...
+        os.makedirs(dirname(media.abs_path), exist_ok=True)
 
         command = [
             'ffmpeg', '-loglevel', 'error', '-y', '-i',
@@ -141,7 +137,7 @@ class RecordingControl(object):
         '''
         # TODO: Here is where we would skip commercials etc.
         try:
-            metadata.ffprobe(self.recording.media.type_instance())
+            metadata.ffprobe(self.recording.media.subtype())
 
         except Exception as e:
             LOGGER.exception(e)
@@ -187,13 +183,7 @@ class RecordingControl(object):
 
 
 class TaskRecordingManager(BaseTask):
-    lock = threading.Lock()
-
     def _run(self, purge=False):
-        if not self.lock.acquire(False):
-            LOGGER.debug('Recording manager lock acquisition failed')
-            return
-
         if purge:
             try:
                 expiration = timezone.now() - timedelta(hours=2)
@@ -209,14 +199,10 @@ class TaskRecordingManager(BaseTask):
                 # reported.
                 LOGGER.exception(e)
 
-        try:
-            queryset = Recording.objects.exclude(status=Recording.STATUS_DONE)
+        queryset = Recording.objects.exclude(status=Recording.STATUS_DONE)
 
-            LOGGER.debug(
-                'Controlling %i active recording(s)', len(queryset))
+        LOGGER.debug(
+            'Controlling %i active recording(s)', len(queryset))
 
-            for recording in queryset:
-                RecordingControl(recording).control()
-
-        finally:
-            self.lock.release()
+        for recording in queryset:
+            RecordingControl(recording).control()
