@@ -1,7 +1,5 @@
 import os
-import sys
 import logging
-import uuid
 import subprocess
 import socket
 import tempfile
@@ -10,7 +8,6 @@ import time
 import multiprocessing
 import select
 import errno
-import shutil
 
 from os.path import join as pathjoin
 from os.path import dirname, isfile
@@ -19,7 +16,6 @@ import psutil
 import daemon
 
 from django.http import FileResponse, Http404
-from django.urls import reverse
 from django.shortcuts import get_object_or_404
 from django.db.transaction import atomic
 
@@ -28,7 +24,6 @@ from rest_framework import status
 
 from api.models import Stream
 from api.serializers import StreamSerializer
-from main import util
 
 
 LOGGER = logging.getLogger(__name__)
@@ -92,38 +87,7 @@ def _alive(pids):
     return any([p for p in pids if psutil.pid_exists(p)])
 
 
-def _tail(process, input, pids):
-    written, where, last_data = 0, 0, time.time()
-
-    while True:
-        # See if our streams are ready for I/O...
-        input_readable = where < os.fstat(input.fileno()).st_size
-        output_writable = \
-            select.select([], [process.stdin], [], 1.0)[1]
-
-        if input_readable and output_writable:
-            data = input.read()
-            if data:
-                written += len(data)
-                where, last_data = input.tell(), time.time()
-                process.stdin.write(data)
-
-            elif not pids and not input_readable:
-                # No writers, EOF
-                break
-
-        else:
-            time.sleep(1.0)
-
-        # If all of our writer pids have died, and we have not seen
-        # data for 5s, move to next file.
-        if not _alive(pids) and last_data < time.time() - 5:
-            break
-
-    LOGGER.debug('Wrote %i bytes from %s', written, input.name)
-
-
-def _tails(process, paths):
+def _tail(path, process):
     '''
     Read each path in turn and write it to the given process.
 
@@ -140,15 +104,41 @@ def _tails(process, paths):
     exit due to EOF.
     '''
     try:
-        for path in paths:
-            # Find processes currently writing to the file.
-            pids = _find_writers(path)
-            LOGGER.debug(
-                'Found %i writers for path "%s": %s', len(pids), path,
-                ",".join([str(p) for p in pids]))
+        # Find processes currently writing to the file.
+        pids = _find_writers(path)
+        LOGGER.debug(
+            'Found %i writers for path "%s": %s', len(pids), path,
+            ",".join([str(p) for p in pids]))
 
-            with open(path, 'rb') as input:
-                _tail(process, input, pids)
+        with open(path, 'rb') as input:
+            written, where, last_data = 0, 0, time.time()
+
+            while True:
+                # See if our streams are ready for I/O...
+                input_readable = where < os.fstat(input.fileno()).st_size
+                output_writable = \
+                    select.select([], [process.stdin], [], 1.0)[1]
+
+                if input_readable and output_writable:
+                    data = input.read()
+                    if data:
+                        written += len(data)
+                        where, last_data = input.tell(), time.time()
+                        process.stdin.write(data)
+
+                    elif not pids and not input_readable:
+                        # No writers, EOF
+                        break
+
+                else:
+                    time.sleep(1.0)
+
+                # If all of our writer pids have died, and we have not seen
+                # data for 5s, move to next file.
+                if not _alive(pids) and last_data < time.time() - 5:
+                    break
+
+            LOGGER.debug('Wrote %i bytes from %s', written, input.name)
 
         LOGGER.info('Input EOF, _tail() exiting.')
         process.stdin.close()
@@ -165,7 +155,7 @@ def _tails(process, paths):
             process.wait()
 
 
-def _daemonize(command, paths, pid_file, workdir):
+def _daemonize(src, command, dst, pid_file):
     '''
     Fork into background so our transcoding won't die with us.
     '''
@@ -173,7 +163,7 @@ def _daemonize(command, paths, pid_file, workdir):
             detach_process=True,
             pidfile=pid_file):
 
-        log_file_path = pathjoin(workdir, 'ffmpeg.stderr')
+        log_file_path = pathjoin(dirname(dst), 'ffmpeg.stderr')
         
         with open(log_file_path, 'ab') as log_file:
             log_file.write(b'\n%s\n\n' % (' '.join(command)).encode('utf8'))
@@ -182,19 +172,18 @@ def _daemonize(command, paths, pid_file, workdir):
             process = subprocess.Popen(
                 command, stdin=subprocess.PIPE, stderr=log_file, shell=False)
 
-            _tails(process, paths)
+            _tail(src, process)
 
 
-def _tail_to_ffmpeg(paths, command, workdir=None):
+def _tail_to_ffmpeg(src, command, dst):
     '''
     Spawn a command and send a number of files to it's stdin.
     '''
-    workdir = workdir if workdir else dirname(paths[0])
-    pid_file = Pidfile(pathjoin(workdir, 'ffmpeg.pid'))
+    pid_file = Pidfile(pathjoin(dirname(dst), 'ffmpeg.pid'))
 
     # daemon kills the host process, so start an intermediary...
     p_tail = multiprocessing.Process(
-        target=_daemonize, args=(command, paths, pid_file, workdir))
+        target=_daemonize, args=(src, command, dst, pid_file))
     p_tail.daemon = False
     p_tail.start()
 
@@ -242,7 +231,6 @@ class CreatingStreamSerializer(StreamSerializer):
 
         temp = tempfile.mkdtemp(prefix='.stream-%s-' % obj.id)
         playlist = pathjoin(temp, 'stream.m3u8')
-        file_names = util.get_recordings(obj.media.abs_path)
 
         # TODO: we need to detect the existing format and decide whether to
         # transcode or copy.
@@ -252,11 +240,14 @@ class CreatingStreamSerializer(StreamSerializer):
             '0', '-hls_time', '3', playlist,
         ]
 
-        LOGGER.info(
-            'Piping %s to: "%s"', ','.join(file_names), " ".join(command))
+        LOGGER.debug(
+            'Piping %s to: "%s"', media.abs_path, " ".join(command))
 
         # The video file could be written to, use tail to follow the file.
-        pid = _tail_to_ffmpeg(file_names, command, dirname(playlist))
+        LOGGER.info('Starting transcoding daemon')
+        pid = _tail_to_ffmpeg(media.abs_path, command, playlist)
+        LOGGER.info('Transcoding daemon on pid: %i', pid)
+
         obj.update(pid=pid, path=temp)
 
         return obj

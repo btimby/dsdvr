@@ -1,7 +1,10 @@
 import logging
 import threading
 import subprocess
+import multiprocessing
+import time
 import signal
+import select
 
 from datetime import timedelta
 
@@ -9,6 +12,7 @@ from os.path import join as pathjoin
 from os.path import dirname
 
 import psutil
+import daemon
 
 from django.utils import timezone
 from django.db.transaction import atomic
@@ -16,20 +20,54 @@ from django.db.transaction import atomic
 from api.models import Recording, Library, Media
 from api.tasks import BaseTask, metadata
 
-from main import util
-
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(logging.NullHandler())
 
 
+def _tail(command, path):
+    log_file = open(
+        pathjoin(dirname(path), 'ffmpeg.stderr'), 'ab')
+    log_file.write(b'\n%s\n\n' % (' '.join(command).encode('utf8')))
+    log_file.flush()
+
+    process = subprocess.Popen(
+        command, stderr=log_file, stdout=subprocess.PIPE, shell=False)
+
+    written = 0
+    with open(path, 'ab') as output:
+        while process.poll() is None:
+            input_readable = \
+                select.select([process.stdout], [], [], 1.0)[0]
+
+            if input_readable:
+                data = process.stdout.read(1024 ** 2 * 3)
+                if data:
+                    written += len(data)
+                    output.write(data)
+
+            else:
+                time.sleep(0.1)
+
+    LOGGER.info(
+        'Recording process exited with: %i after writing %i bytes',
+        process.poll(), written)
+
+
+def _daemonize(command, pid_file, path):
+    with daemon.DaemonContext(pidfile=pid_file, detach_process=True):
+        _tail(command, path)
+
+
 class RecordingControl(object):
     def __init__(self, recording):
         self.recording = recording
 
-    @atomic
+    @atomic(immediate=True)
     def _start_recording(self):
+        from api.views.streams import Pidfile
+
         # TODO: Setup wizard or similar must make user configure a library for
         # recordings... Perhaps we use a sane default? Can't think of one...
         # In any case, the first Library may not be the right one.
@@ -40,50 +78,31 @@ class RecordingControl(object):
 
         media, _ = Media.objects.get_or_create_from_program(
             self.recording.program, library=library)
-        recording_path = util.get_next_recording(media.abs_path)
 
         command = [
-            'ffmpeg', '-loglevel', 'error', '-n', '-i',
+            'ffmpeg', '-loglevel', 'error', '-y', '-i',
             self.recording.program.channel.stream, '-c:v', 'copy', '-pix_fmt',
             'yuv420p', '-c:a', 'aac', '-profile:a', 'aac_low', '-f', 'mpegts',
-            recording_path,
+            'pipe:1',
         ]
 
-        if recording_path.endswith('recording0.mpeg'):
-            frame0_path = pathjoin(dirname(recording_path), 'frame0.jpg')
-            command.extend([
-                '-vframes', '1', '-f', 'image2', frame0_path
-            ])
-
-        log_file = open(
-            pathjoin(dirname(recording_path), 'ffmpeg.stderr'), 'ab')
-        log_file.write(b'\n%s\n\n' % (' '.join(command).encode('utf8')))
-        log_file.flush()
+        frame0_path = media.frame0_path
+        command.extend([
+            '-vframes', '1', '-f', 'image2', frame0_path
+        ])
 
         LOGGER.info('Spawning: "%s"', " ".join(command))
-        process = subprocess.Popen(command, stderr=log_file, shell=False)
+
+        pid_file = Pidfile(pathjoin(dirname(media.abs_path), 'ffmpeg.pid'))
+        t_rec = multiprocessing.Process(
+            target=_daemonize, args=(command, pid_file, media.abs_path))
+        t_rec.daemon = False
+        t_rec.start()
+
+        pid = pid_file.poll()
+        LOGGER.debug('Recording daemon on pid: %i', pid)
         self.recording.update(
-            media=media, status=Recording.STATUS_RECORDING, pid=process.pid)
-
-        # Let ffmpeg get started, then check if it died and report stderr.
-        try:
-            r = process.wait(2)
-        
-        except subprocess.TimeoutExpired:
-            pass
-
-        else:
-            LOGGER.error(
-                'ffmpeg died with error %i: %s', r,
-                util.last_3_lines(process.stderr))
-
-        try:
-            metadata.omdb(media)
-
-        except Exception as e:
-            LOGGER.exception(e)
-
-        return process
+            media=media, status=Recording.STATUS_RECORDING, pid=pid)
 
     def _get_process(self):
         '''
@@ -121,9 +140,8 @@ class RecordingControl(object):
         mpegts as a container.
         '''
         # TODO: Here is where we would skip commercials etc.
-        util.combine_recordings(self.recording.media.abs_path)
         try:
-            metadata.ffprobe(self.recording.media)
+            metadata.ffprobe(self.recording.media.type_instance())
 
         except Exception as e:
             LOGGER.exception(e)

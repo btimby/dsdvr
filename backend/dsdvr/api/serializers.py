@@ -360,7 +360,7 @@ class StreamSerializer(serializers.ModelSerializer):
     type = DisplayChoiceField(
         choices=list(Stream.TYPE_NAMES.items()))
     url = serializers.SerializerMethodField()
-    cursor = CursorField(max_digits=12, decimal_places=6)
+    cursor = CursorField(max_digits=12, decimal_places=6, required=False)
 
     # NOTE: this seems a bit hacky, but the create() and update() overrides
     # Allow for a writable SerializerMethodField().
