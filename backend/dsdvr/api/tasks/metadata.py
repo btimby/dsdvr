@@ -140,19 +140,6 @@ class TaskMetadataFetch(BaseTask):
     Fetch metadata for a media item.
     '''
 
-    lock = threading.Lock()
-
-    def _get_metadata(self, media):
+    def _run(self, media):
         ffprobe(media)
         omdb(media)
-
-    def _run(self, obj):
-        if not self.lock.acquire(False):
-            LOGGER.debug('Metadata fetch lock acquisition failed')
-            return
-
-        try:
-            self._get_metadata(obj)
-
-        finally:
-            self.lock.release()

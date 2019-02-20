@@ -168,8 +168,8 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'console': {
-            # exact format is not important, this is the minimum information
-            'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+            'format': '%(asctime)s [%(process)s:%(threadName).8s] '
+                      '%(name)-12.12s %(levelname)-8s %(message)s',
         },
     },
     'handlers': {

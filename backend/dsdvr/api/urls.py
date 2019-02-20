@@ -23,6 +23,7 @@ from api.views.media import MediaViewSet, MediaStreamViewSet, poster, frame0
 from api.views.series import SeriesViewSet
 from api.views.me import MeView
 from api.views.status import StatusView
+from api.views.images import ImageViewSet, image
 
 
 router = DefaultRouter()
@@ -41,6 +42,7 @@ router.register('categories', CategoryViewSet, base_name='categories')
 router.register('programs', ProgramViewSet, base_name='programs')
 router.register('media', MediaViewSet, base_name='media')
 router.register('series', SeriesViewSet, base_name='series')
+router.register('images', ImageViewSet, base_name='images')
 
 
 urlpatterns = [
@@ -80,5 +82,7 @@ urlpatterns = [
         name='token_refresh'),
 
     path('me/', MeView.as_view(), name='me'),
+
+    path('images/<uuid:pk>/image.jpg', image, name='images-view'),
 
 ] + router.urls

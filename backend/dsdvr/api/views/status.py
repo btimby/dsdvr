@@ -135,6 +135,7 @@ def get_system_stats():
 
 
 class StatusSerializer(serializers.Serializer):
+    authenticated = serializers.BooleanField()
     config = serializers.JSONField()
     system = serializers.SerializerMethodField()
     tasks = serializers.SerializerMethodField()
@@ -154,7 +155,7 @@ class StatusSerializer(serializers.Serializer):
         return get_system_stats()
 
     def get_tasks(self, obj):
-        return TaskSerializer(TASKS, many=True).data
+        return TaskSerializer(TASKS.values(), many=True).data
 
     def get_recordings(self, obj):
         return RecordingSerializer(Recording.objects.all(), many=True).data
@@ -178,6 +179,7 @@ class StatusView(views.APIView):
 
     def get(self, request):
         status = {
+            'authenticated': request.user.is_authenticated,
             # For now, True, later check configuration for required keys.
             'config': {
                 'users': User.objects.count(),

@@ -18,6 +18,7 @@ import uuid
 
 from datetime import datetime, timedelta
 
+from django.utils import timezone
 from django.http import Http404
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -34,14 +35,16 @@ LOGGER.addHandler(logging.NullHandler())
 TASKS = {}
 
 STATUS_NONE = None
-STATUS_RUNNING = 1
+STATUS_QUEUED = 1
+STATUS_RUNNING = 2
 STATUS_DONE = 0
-STATUS_ERROR = 2
-STATUS_TERMINATING = 3
-STATUS_TERMINATED = 4
+STATUS_ERROR = 3
+STATUS_TERMINATING = 4
+STATUS_TERMINATED = 5
 
 STATUS_NAMES = {
     STATUS_NONE: 'none',
+    STATUS_QUEUED: 'queued',
     STATUS_RUNNING: 'running',
     STATUS_DONE: 'done',
     STATUS_ERROR: 'error',
@@ -71,7 +74,7 @@ class BaseTask(object):
         self.kwargs = kwargs or {}
         self.done = 0
         self.total = 0
-        self.created = None
+        self.created = timezone.now()
         self.modified = None
         self.thread = None
         self.status = STATUS_NONE
@@ -80,9 +83,14 @@ class BaseTask(object):
         self.elapsed = 0
         self.remaining = 0
         self.exit = threading.Event()
+        # Create a subclass-wide lock to lock all tasks of the same type.
+        self.__class__.lock = threading.Lock()
 
     def enqueue(self, background=False):
         TASK_QUEUE.put(self)
+
+        self.status = STATUS_QUEUED
+        self._set_progress(0, 1, 'Awaiting execution.')
 
         if not background:
             TASKS[str(self.id)] = self
@@ -118,7 +126,7 @@ class BaseTask(object):
         if self.created:
             # If the task has been started, calculate how many seconds it has
             # been running.
-            elapsed = (datetime.utcnow() - self.created).total_seconds()
+            elapsed = (timezone.now() - self.created).total_seconds()
 
             # Then use the percentage of completion to determine how much more
             # runtime remains.
@@ -139,7 +147,7 @@ class BaseTask(object):
         '''
         self.done = done
         self.total = total
-        self.modified = datetime.utcnow()
+        self.modified = timezone.now()
 
         # Only update summary if one is provided. Thus a task can provide an
         # initial summary that will remain during its run.
@@ -156,18 +164,27 @@ class BaseTask(object):
         '''
         Entry point for Task thread.
         '''
+        if not self.lock.acquire(False):
+            LOGGER.debug('Metadata fetch lock acquisition failed')
+            return
+
         try:
-            self._run(*self.args, **self.kwargs)
-            self.status = STATUS_DONE
+            self.status = STATUS_RUNNING
+            try:
+                self._run(*self.args, **self.kwargs)
+                self.status = STATUS_DONE
 
-        except TaskTerminationException:
-            LOGGER.info('Task thread terminated.')
-            self.status = STATUS_TERMINATED
+            except TaskTerminationException:
+                LOGGER.info('Task thread terminated.')
+                self.status = STATUS_TERMINATED
 
-        except Exception as e:
-            LOGGER.debug('Error in task', exc_info=True)
-            self.status = STATUS_ERROR
-            self.summary = str(e)
+            except Exception as e:
+                LOGGER.debug('Error in task', exc_info=True)
+                self.status = STATUS_ERROR
+                self.summary = str(e)
+
+        finally:
+            self.lock.release()
 
     def _run(self, *args, **kwargs):
         '''
@@ -198,7 +215,7 @@ class TaskCleanup(BaseTask):
                 # Leave tasks that have activity within the last 5 minutes
                 # alone.
                 last_activity = task.modified or task.created
-                if last_activity >= datetime.utcnow() - timedelta(minutes=5):
+                if last_activity >= timezone.now() - timedelta(minutes=5):
                     continue
 
                 LOGGER.debug('Purging stale task id: %s', task.id)

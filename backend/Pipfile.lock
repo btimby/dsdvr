@@ -297,7 +297,7 @@
         },
         "pysd": {
             "git": "https://github.com/btimby/pysd.git",
-            "ref": "5a289a4162b4bce9dbaa77ec3c0ada67c57209db"
+            "ref": "f6ffa1089c82a2934b061c8778661a260a49e1b6"
         },
         "python-daemon": {
             "hashes": [

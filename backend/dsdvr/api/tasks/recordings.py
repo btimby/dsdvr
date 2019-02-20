@@ -183,13 +183,7 @@ class RecordingControl(object):
 
 
 class TaskRecordingManager(BaseTask):
-    lock = threading.Lock()
-
     def _run(self, purge=False):
-        if not self.lock.acquire(False):
-            LOGGER.debug('Recording manager lock acquisition failed')
-            return
-
         if purge:
             try:
                 expiration = timezone.now() - timedelta(hours=2)
@@ -205,14 +199,10 @@ class TaskRecordingManager(BaseTask):
                 # reported.
                 LOGGER.exception(e)
 
-        try:
-            queryset = Recording.objects.exclude(status=Recording.STATUS_DONE)
+        queryset = Recording.objects.exclude(status=Recording.STATUS_DONE)
 
-            LOGGER.debug(
-                'Controlling %i active recording(s)', len(queryset))
+        LOGGER.debug(
+            'Controlling %i active recording(s)', len(queryset))
 
-            for recording in queryset:
-                RecordingControl(recording).control()
-
-        finally:
-            self.lock.release()
+        for recording in queryset:
+            RecordingControl(recording).control()
