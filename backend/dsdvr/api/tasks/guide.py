@@ -287,6 +287,113 @@ class TaskGuideImport(BaseTask):
 
 
 class TaskGuideDownload(BaseTask):
+    def _get_channel(self, station):
+        number = station.channel.lstrip('0')
+
+        # Try for an exact match:
+        try:
+            return Channel.objects.get(
+                number=number, callsign=station.callsign)
+
+        except Channel.DoesNotExist:
+            pass
+
+        try:
+            channel_obj = Channel.objects.get(
+                Q(number=number) | Q(callsign=station.callsign))
+
+        except Channel.MultipleObjectsReturned:
+            LOGGER.warning(
+                'Multiple channels match: %s, %s', number, station.callsign)
+            return
+
+        except Channel.DoesNotExist:
+            LOGGER.warning(
+                'No match for channel: %s %s', number, station.callsign)
+            return
+
+        # Warn on this since we potentially destroy data...
+        if channel_obj.number != number or \
+            channel_obj.callsign != callsign:
+            LOGGER.warning(
+                'Partial channel match: (%s, %s) ~= (%s, %s)',
+                channel_obj.number, channel_obj.callsign, number,
+                station.callsign)
+
+        channel_obj.update(
+            name=station.name,
+            callsign=station.callsign
+        )
+
+        return channel_obj
+
+    def _get_program(self, program):
+        defaults = {
+            'title': program.title,
+            'subtitle': program.subtitle,
+            'desc': program.description,
+        }
+
+        program_obj, _ = Program.objects.update_or_create(
+            program_id=program.id, defaults=defaults
+        )
+
+        for actor in program.actors:
+            ProgramActor.objects.get_or_create(
+                program=program_obj,
+                person=Person.objects.get_or_create(name=actor.name)[0]
+            )
+
+        # Treat entityType and showType like categories. We can use
+        # them to create the correct media type if the program is
+        # recorded. Also they make sense as a category, since they can
+        # be: Movie, Show, Special, etc.
+        for category in program.genres + [program.entity_type,
+                                          program.show_type]:
+            program_obj.categories.add(
+                Category.objects.get_or_create(name=category)[0]
+            )
+
+        for art in program.artwork:
+            program_obj.images.add(
+                Image.objects.get_or_create(url=art.url)[0]
+            )
+
+        return program_obj
+
+    def _get_schedule(self, program_obj, schedule):
+        channel_obj = self._get_channel(schedule.station)
+
+        # We don't have this channel...
+        if channel_obj is None:
+            return
+
+        start = schedule.airdatetime
+        duration = schedule.duration
+        stop = start + timedelta(seconds=duration)
+
+        defaults = {
+            'stop': stop,
+            'duration': duration,
+            'program': program_obj,
+        }
+
+        if schedule.rating:
+            defaults['rating'], _ = Rating.objects.get_or_create(
+                name=schedule.rating)
+
+        # TODO: clear out the scheduling window by deleting conflicts?
+        try:
+            return Schedule.objects.update_or_create(
+                channel=channel_obj, start=start, defaults=defaults
+            )
+
+        except IntegrityError:
+            LOGGER.debug(
+                'channel.callsign: %s, start: %s, stop: %s',
+                channel_obj.callsign, start, stop)
+            raise
+
     def _run(self):
         self._set_progress(0, 1, 'Downloading guide data...')
 
@@ -312,99 +419,10 @@ class TaskGuideDownload(BaseTask):
             # We don't create channels, that is done when tuners are
             # discovered.
             with atomic(immediate=True):
-                defaults = {
-                    'title': program.title,
-                    'subtitle': program.subtitle,
-                    'desc': program.description,
-                }
-
-                program_obj, _ = Program.objects.update_or_create(
-                    program_id=program.id, defaults=defaults
-                )
-
-                for actor in program.actors:
-                    ProgramActor.objects.get_or_create(
-                        program=program_obj,
-                        person=Person.objects.get_or_create(name=actor.name)[0]
-                    )
-
-                # Treat entityType and showType like categories. We can use
-                # them to create the correct media type if the program is
-                # recorded. Also they make sense as a category, since they can
-                # be: Movie, Show, Special, etc.
-                for category in program.genres + [program.entity_type,
-                                                  program.show_type]:
-                    program_obj.categories.add(
-                        Category.objects.get_or_create(name=category)[0]
-                    )
-
-                for art in program.artwork:
-                    program_obj.images.add(
-                        Image.objects.get_or_create(url=art.url)[0]
-                    )
+                program_obj = self._get_program(program)
 
                 for schedule in program.schedules:
-                    start = schedule.airdatetime
-                    duration = schedule.duration
-                    stop = start + timedelta(seconds=duration)
-
-                    try:
-                        channel_obj = Channel.objects.get(
-                            Q(number=schedule.station.channel) |
-                            Q(callsign=schedule.station.callsign)
-                        )
-
-                    except Channel.MultipleObjectsReturned:
-                        LOGGER.warning(
-                            'Multiple channels match: %s, %s',
-                            schedule.station.channel,
-                            schedule.station.callsign)
-                        continue
-
-                    except Channel.DoesNotExist:
-                        LOGGER.warning(
-                            'No match for channel: %s %s',
-                            schedule.station.channel,
-                            schedule.station.callsign)
-                        continue
-
-                    # Warn on this since we potentially destroy data...
-                    if channel_obj.number != schedule.station.channel or \
-                       channel_obj.callsign != schedule.station.callsign:
-                        LOGGER.warning(
-                            'Partial channel match: (%s, %s) ~= (%s, %s)',
-                            channel_obj.number, channel_obj.callsign,
-                            schedule.station.channel,
-                            schedule.station.callsign
-                        )
-
-                    channel_obj.update(
-                        name=schedule.station.name,
-                        callsign=schedule.station.callsign
-                    )
-
-                    defaults = {
-                        'stop': stop,
-                        'duration': duration,
-                        'program': program_obj,
-                    }
-
-                    if schedule.rating:
-                        defaults['rating'], _ = Rating.objects.get_or_create(
-                            name=schedule.rating)
-
-                    # TODO: clear out the scheduling window by deleting
-
-                    try:
-                        Schedule.objects.update_or_create(
-                            channel=channel_obj, start=start, defaults=defaults
-                        )
-
-                    except IntegrityError:
-                        LOGGER.debug(
-                            'channel.callsign: %s, start: %s, stop: %s',
-                            channel_obj.callsign, start, stop)
-                        raise
+                    self._get_schedule(program_obj, schedule)
 
             count += 1
             self._set_progress(
