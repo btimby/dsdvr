@@ -4,8 +4,7 @@ from rest_framework_simplejwt import views as simplejwt
 from rest_framework.routers import DefaultRouter
 
 from api.views.tasks import TaskViewSet
-from api.views.tuners import TunerViewSet
-from api.views.tuners import TunerScanView
+from api.views.tuners import TunerViewSet, ChannelScanView
 from api.views.recordings import RecordingViewSet
 from api.views.guide import GuideViewSet
 from api.views.guide import GuideUploadViewSet
@@ -58,7 +57,7 @@ urlpatterns = [
     path('guide/upload/', GuideUploadViewSet.as_view({'post': 'create'})),
 
     # Standalone view that allows scanning a tuner for new channels.
-    path('tuners/<uuid:pk>/scan/', TunerScanView.as_view()),
+    path('tuners/<uuid:pk>/scan/', ChannelScanView.as_view()),
 
     # Standalone view that manages media streams.
     path('media/<uuid:pk>/stream/', MediaStreamViewSet.as_view({

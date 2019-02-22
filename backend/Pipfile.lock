@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "99433e712ff6376f13b7987cf06386cb909309a9d81fa67f7adf1bd33661d41e"
+            "sha256": "8e9a0f53d18b5f70f3bad696fc20ed6ecb6757d11be769050e61d503ed60f945"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -215,7 +215,7 @@
         },
         "libhdhomerun": {
             "git": "https://github.com/btimby/python-libhdhomerun.git",
-            "ref": "540d52f1c620e65ccc3a6db2b907c60ea232c8c2"
+            "ref": "77714ad967f8cab244b729d3fa67d5820de2bd24"
         },
         "lockfile": {
             "hashes": [
@@ -295,10 +295,6 @@
             "index": "pypi",
             "version": "==2.2.2"
         },
-        "pysd": {
-            "git": "https://github.com/btimby/pysd.git",
-            "ref": "f6ffa1089c82a2934b061c8778661a260a49e1b6"
-        },
         "python-daemon": {
             "hashes": [
                 "sha256:1d9a541f74822ac87045163ebd5473f9a7b22ab4031ed28293aba81fdaf6c156",
@@ -343,6 +339,10 @@
             ],
             "index": "pypi",
             "version": "==0.6.8"
+        },
+        "sdgrabber": {
+            "git": "https://github.com/btimby/pysd.git",
+            "ref": "92f73c125e16e9e51fd3145889be904f8cbf890b"
         },
         "sentry-sdk": {
             "hashes": [

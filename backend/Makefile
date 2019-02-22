@@ -24,6 +24,12 @@ migrations:
 migrate:
 	pipenv run python dsdvr/manage.py migrate
 
+update:
+	pipenv update
+
+superuser:
+	pipenv run python dsdvr/manage.py createsuperuser
+
 run:
 	pipenv run python dsdvr/manage.py runserver
 

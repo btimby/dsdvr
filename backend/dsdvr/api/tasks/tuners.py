@@ -1,20 +1,25 @@
 import logging
+import ctypes
 
 import requests
 
 from xml.etree.cElementTree import iterparse
 
 from libhdhomerun import (
-    hdhomerun_discover_device_t, HDHOMERUN_DEVICE_TYPE_TUNER,
-    HDHOMERUN_DEVICE_ID_WILDCARD,
+    hdhomerun_discover_device_t, hdhomerun_channelscan_result_t,
+    HDHOMERUN_DEVICE_TYPE_TUNER, HDHOMERUN_DEVICE_ID_WILDCARD,
 )
 from libhdhomerun import (
     hdhomerun_device_create, hdhomerun_device_destroy,
-    hdhomerun_discover_destroy, hdhomerun_device_get_device_id,
-    hdhomerun_device_get_device_ip, hdhomerun_device_get_model_str,
-    hdhomerun_discover_find_devices_custom_v2,
+    hdhomerun_device_get_device_id, hdhomerun_device_get_device_ip,
+    hdhomerun_device_get_model_str, hdhomerun_discover_find_devices_custom_v2,
+    hdhomerun_device_get_tuner_channelmap,
+    hdhomerun_channelmap_get_channelmap_scan_group,
+    hdhomerun_device_channelscan_init, hdhomerun_device_channelscan_advance,
+    hdhomerun_device_channelscan_detect,
+    hdhomerun_device_channelscan_get_progress,
 )
-from libhdhomerun.util import ip_to_str
+from libhdhomerun.util import ip_to_str, str_to_ip
 
 from django.db.transaction import atomic
 
@@ -64,7 +69,7 @@ class TaskTunerDiscover(BaseTask):
                 tuner_count = discovered[i].tuner_count
 
                 hdhomerun_device_destroy(device)
-                
+
                 LOGGER.debug(
                     'Tuner found: name=%s, ip=%s, model=%s, tuners=%s', name,
                     ipaddr, model, tuner_count)
@@ -74,7 +79,7 @@ class TaskTunerDiscover(BaseTask):
 
                 except Tuner.DoesNotExist:
                     tuner = Tuner.objects.create(
-                        name=name, ipaddr=ipaddr, model=model,
+                        device_id=name, device_ip=ipaddr, model=model,
                         tuner_count=tuner_count)
 
                 tuners.append(tuner)
@@ -123,7 +128,8 @@ class TaskTunerDiscover(BaseTask):
             elif el.tag == 'Program':
                 with atomic(immediate=True):
                     Channel.objects.update_or_create(
-                        tuner=tuner, number=data['number'], name=data['name'],
+                        tuner=tuner, number=data['number'],
+                        callsign=data['name'],
                         defaults={
                             'stream': data['stream'],
                             'hd': data.get('hd', False),
@@ -151,6 +157,50 @@ class TaskTunerDiscover(BaseTask):
         self._set_progress(done, total, 'Discovered %i Tuners.' % done)
 
 
-class TaskTunerScan(BaseTask):
-    def _run(self, tuner):
-        self._set_progress(1, 1, 'Scan complete.')
+class TaskChannelScan(BaseTask):
+    def _scan_channels(self, tuner):
+        device = hdhomerun_device_create(
+            tuner.device_id, str_to_ip(tuner.device_ip), 0, None)
+
+        channelmap = ctypes.c_char_p()
+        hdhomerun_device_get_tuner_channelmap(device, ctypes.byref(channelmap))
+        group = hdhomerun_channelmap_get_channelmap_scan_group(channelmap)
+        rc = hdhomerun_device_channelscan_init(device, group)
+        if rc != 1:
+            raise Exception('Could not initialize channel scan, rc: %i', rc)
+
+        while True:
+            scan_result = hdhomerun_channelscan_result_t()
+            rc = hdhomerun_device_channelscan_advance(
+                device, ctypes.byref(scan_result))
+            if rc != 1:
+                break
+
+            LOGGER.debug('Scanning frequency %i' % (scan_result.frequency))
+
+            rc = hdhomerun_device_channelscan_detect(
+                device, ctypes.byref(scan_result))
+            if rc != 1:
+                LOGGER.debug('detection failed')
+                break
+
+            LOGGER.debug('programs detected: %i' % (scan_result.program_count))
+            for i in range(scan_result.program_count):
+                program = scan_result.programs[i]
+                LOGGER.debug(program.program.decode('UTF-8'))
+                # channels.append(channelTuple(frequency=scan_result.frequency,
+                # name=program.name, program_number=program.program_number,
+                # type=program.type, virtual_major=program.virtual_major,
+                # virtual_minor=program.virtual_minor))
+
+            yield hdhomerun_device_channelscan_get_progress(device)
+
+    def _run(self, tuners):
+        tuner_cnt, percent = len(tuners), 0
+
+        for tuner in tuners:
+            for scan_pct in self._scan_channels(tuner):
+                percent += scan_pct / tuner_cnt
+                self._set_progress(percent, 100, 'Scanning channels.')
+
+        self._set_progress(100, 100, 'Scan complete.')

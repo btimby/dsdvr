@@ -3,9 +3,9 @@ import os
 from django.conf import settings
 
 
-GUIDE_METHOD = 'manual'
-GUIDE_SD_USERNAME = None
-GUIDE_SD_PASSWORD = None
+GUIDE_METHOD = os.environ.get('DSDVR_GUIDE_METHOD', 'manual')
+GUIDE_SD_USERNAME = os.environ.get('DSDVR_SD_USERNAME', None)
+GUIDE_SD_PASSWORD = os.environ.get('DSDVR_SD_PASSWORD', None)
 OMDB_API_KEY = os.environ.get('DSDVR_OMDB_API_KEY', None)
 STORAGE_MEDIA = os.environ.get('DSDVR_STORAGE_MEDIA',
                                '/var/tmp/dsdvr/media')

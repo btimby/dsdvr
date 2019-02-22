@@ -247,8 +247,8 @@ class Device(UpdateMixin, CreatedModifiedModel):
 
 class Tuner(UpdateMixin, CreatedModifiedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=32, unique=True)
-    ipaddr = models.GenericIPAddressField()
+    device_id = models.IntegerField(unique=True)
+    device_ip = models.GenericIPAddressField()
     model = models.CharField(max_length=48)
     tuner_count = models.SmallIntegerField()
 
@@ -264,6 +264,7 @@ class Channel(UpdateMixin, CreatedModifiedModel):
         Tuner, on_delete=models.CASCADE, related_name='channels')
     number = models.CharField(max_length=8)
     name = models.CharField(max_length=8)
+    callsign = models.CharField(max_length=32)
     stream = models.CharField(max_length=256, null=True)
     images = models.ManyToManyField(Image, related_name='channels')
     poster = models.ForeignKey(
@@ -439,29 +440,19 @@ class ProgramManager(models.Manager):
 
 
 class Program(UpdateMixin, CreatedModifiedModel):
-    class Meta:
-        unique_together = (
-            ('channel', 'start'),
-            ('channel', 'stop'),
-        )
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    channel = models.ForeignKey(
-        Channel, on_delete=models.CASCADE, related_name='programs')
+    program_id = models.CharField(max_length=32, unique=True)
     season = models.PositiveSmallIntegerField(null=True)
     episode = models.PositiveSmallIntegerField(null=True)
     categories = models.ManyToManyField(Category, related_name='programs')
-    rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
     actors = models.ManyToManyField(Person, through='ProgramActor')
     title = models.CharField(max_length=256)
-    subtitle = models.CharField(max_length=256)
-    desc = models.TextField()
-    start = models.DateTimeField()
-    stop = models.DateTimeField()
-    duration = models.IntegerField()
+    subtitle = models.CharField(null=True,max_length=256)
+    desc = models.TextField(null=True)
     images = models.ManyToManyField(Image, related_name='programs')
     poster = models.ForeignKey(
-        Image, null=True, on_delete=models.SET_NULL, related_name='program_posters')
+        Image, null=True, on_delete=models.SET_NULL,
+        related_name='program_posters')
     previously_shown = models.BooleanField(default=True)
 
     def __str__(self):
@@ -471,6 +462,24 @@ class Program(UpdateMixin, CreatedModifiedModel):
         return 'Show: %s' % str(self)
 
     objects = ProgramManager()
+
+
+class Schedule(UpdateMixin, models.Model):
+    class Meta:
+        unique_together = (
+            ('channel', 'start'),
+            ('channel', 'stop'),
+        )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    channel = models.ForeignKey(
+        Channel, on_delete=models.CASCADE, related_name='programs')
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name='schedules')    
+    rating = models.ForeignKey(Rating, on_delete=models.CASCADE, null=True)
+    start = models.DateTimeField()
+    stop = models.DateTimeField()
+    duration = models.IntegerField()
 
 
 class ShowManager(DefaultTypeManager):
