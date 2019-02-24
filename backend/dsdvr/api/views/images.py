@@ -12,10 +12,10 @@ from rest_framework import viewsets
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 
+from constance import config
+
 from api.models import Image
 from api.serializers import ImageSerializer
-
-from main import settings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class ImageViewSet(viewsets.ModelViewSet):
 def image(request, pk):
     image = get_object_or_404(Image, pk=pk)
     _, ext = splitext(image.url)
-    image_path = pathjoin(settings.STORAGE_TEMP, 'images', '%s%s' % (pk, ext))
+    image_path = pathjoin(config.STORAGE_TEMP, 'images', '%s%s' % (pk, ext))
 
     try:
         image_file = open(image_path, 'rb')

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "8e9a0f53d18b5f70f3bad696fc20ed6ecb6757d11be769050e61d503ed60f945"
+            "sha256": "398e0b049f347906d4a49559b0bc1709348868fd6d672ea00758a9d3f4074776"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -51,6 +51,17 @@
             "index": "pypi",
             "version": "==2.1.7"
         },
+        "django-constance": {
+            "extras": [
+                "database"
+            ],
+            "hashes": [
+                "sha256:5a4fec5361214b4658c64184b45a6678cb8f8bf8d342f56976f87d5c6645860a",
+                "sha256:a49735063b2c30015d2e52a90609ea9798da722ed070f091de51714758a5d018"
+            ],
+            "index": "pypi",
+            "version": "==2.3.1"
+        },
         "django-cors-headers": {
             "hashes": [
                 "sha256:5545009c9b233ea7e70da7dbab7cb1c12afa01279895086f98ec243d7eab46fa",
@@ -59,12 +70,12 @@
             "index": "pypi",
             "version": "==2.4.0"
         },
-        "django-etc": {
+        "django-picklefield": {
             "hashes": [
-                "sha256:267f1911f0e53fdd26ebf619c93bbc1943c615ef53ab48b15894ab298050a3ec",
-                "sha256:6370cfc03887bd83c5fbb9204ee759c611c5402b0d89db472b451a92e7c8ebfb"
+                "sha256:9052f2dcf4882c683ce87b4356f29b4d014c0dad645b6906baf9f09571f52bc8",
+                "sha256:f1733a8db1b6046c0d7d738e785f9875aa3c198215de11993463a9339aa4ea24"
             ],
-            "version": "==1.0.0"
+            "version": "==2.0"
         },
         "django-rest-framework": {
             "hashes": [
@@ -72,14 +83,6 @@
             ],
             "index": "pypi",
             "version": "==0.1.0"
-        },
-        "django-siteprefs": {
-            "hashes": [
-                "sha256:c41c5efc32de222503f4113595d934cc7ebe9d257cf234faeacb8159b2fdb51d",
-                "sha256:e10669d5df7db195a6a8756a5d4aa4dba15674a54a6e29448e71b234aeb52fc4"
-            ],
-            "index": "pypi",
-            "version": "==1.0.0"
         },
         "django-webpack-loader": {
             "hashes": [
@@ -106,18 +109,11 @@
         },
         "djangorestframework-simplejwt": {
             "hashes": [
-                "sha256:9796dd89086999993475a25f2a8ba39b56a5b372cf9b2475d9b29afcf7737be6",
-                "sha256:ce118a3f39499de980aeffef020f421b4689bc8cc14ad236b06a7f6f3d137784"
+                "sha256:5383639106cbc561044d0893a5bfd22dd98b30a11b5e2f7e9da77b333fa6c0b7",
+                "sha256:5fb5153a9051fefe6229492e8b42a4c03b6ee802ea1865c944ff09088fe7340f"
             ],
             "index": "pypi",
-            "version": "==3.3"
-        },
-        "docopt": {
-            "hashes": [
-                "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491"
-            ],
-            "index": "pypi",
-            "version": "==0.6.2"
+            "version": "==4.0.0"
         },
         "docutils": {
             "hashes": [
@@ -126,13 +122,6 @@
                 "sha256:7a4bd47eaf6596e1295ecb11361139febe29b084a87bf005bf899f9a42edc3c6"
             ],
             "version": "==0.14"
-        },
-        "drf-ujson": {
-            "hashes": [
-                "sha256:a4cd6a96eabe8357db9efe5aacf78b3856d2cb13b387aadb4f125fb03adf1324"
-            ],
-            "index": "pypi",
-            "version": "==1.2"
         },
         "entrypoints": {
             "hashes": [
@@ -332,17 +321,9 @@
             "index": "pypi",
             "version": "==2.21.0"
         },
-        "schema": {
-            "hashes": [
-                "sha256:d994b0dc4966000037b26898df638e3e2a694cc73636cb2050e652614a350687",
-                "sha256:fa1a53fe5f3b6929725a4e81688c250f46838e25d8c1885a10a590c8c01a7b74"
-            ],
-            "index": "pypi",
-            "version": "==0.6.8"
-        },
         "sdgrabber": {
             "git": "https://github.com/btimby/pysd.git",
-            "ref": "92f73c125e16e9e51fd3145889be904f8cbf890b"
+            "ref": "031b9a5af1432501cd23d97f76f0080ed09a9fff"
         },
         "sentry-sdk": {
             "hashes": [
@@ -391,12 +372,6 @@
             ],
             "index": "pypi",
             "version": "==0.8.0"
-        },
-        "ujson": {
-            "hashes": [
-                "sha256:f66073e5506e91d204ab0c614a148d5aa938bdbf104751be66f8ad7a222f5f86"
-            ],
-            "version": "==1.35"
         },
         "urllib3": {
             "hashes": [

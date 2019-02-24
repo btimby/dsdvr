@@ -16,13 +16,13 @@ from rest_framework.permissions import AllowAny
 
 from django.contrib.auth import get_user_model
 
+from constance import config
+
 from api.models import Recording, Stream, Tuner, Channel, Program
 from api.views.tasks import TASKS
 from api.serializers import (
     TaskSerializer, RecordingSerializer, StreamSerializer
 )
-
-from main import settings
 
 
 User = get_user_model()
@@ -127,8 +127,8 @@ def get_system_stats():
         Stream.objects.filter(pid__isnull=False).values_list('pid', flat=True)
     )
     stats = {
-        'media': get_directory_stats(settings.STORAGE_MEDIA),
-        'temp': get_directory_stats(settings.STORAGE_TEMP),
+        'media': get_directory_stats(config.STORAGE_MEDIA),
+        'temp': get_directory_stats(config.STORAGE_TEMP),
         'processes': get_process_stats(pids),
     }
     return stats

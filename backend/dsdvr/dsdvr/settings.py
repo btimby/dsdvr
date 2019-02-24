@@ -47,9 +47,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
-    'siteprefs',
     'webpack_loader',
     'corsheaders',
+    'constance',
+    'constance.backends.database',
 
     'api',
     'main',
@@ -219,3 +220,20 @@ REST_FRAMEWORK = {
 }
 
 AUTH_USER_MODEL = 'api.User'
+
+CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
+CONSTANCE_CONFIG = {
+    'GUIDE_METHOD': (os.environ.get('DSDVR_GUIDE_METHOD', 'manual'),
+                     'How to obtain TV schedule data.'),
+    'GUIDE_SD_USER': (os.environ.get('DSDVR_SD_USERNAME', ''),
+                      'Schedules direct username.'),
+    'GUIDE_SD_PASS': (os.environ.get('DSDVR_SD_PASSWORD', ''),
+                      'Schedules direct password.'),
+    'OMDB_API_KEY': (os.environ.get('DSDVR_OMDB_API_KEY', ''),
+                     'API key for fetching media metadata.'),
+    'STORAGE_MEDIA': (os.environ.get('DSDVR_STORAGE_MEDIA',
+                                     '/var/tmp/dsdvr/media'),
+                      'Where to store media files.'),
+    'STORAGE_TEMP': (os.environ.get('DSDVR_STORAGE_TEMP', '/var/tmp/dsdvr'),
+                     'Where to store temporary files.'),
+}

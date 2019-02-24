@@ -12,13 +12,13 @@ from django.db.utils import IntegrityError
 from django.db.transaction import atomic
 from django.db.models import Q
 
+from constance import config
+
 from api.models import (
     Channel, Rating, Category, Program, Person, ProgramActor, Image, Tuner,
     Schedule,
 )
 from api.tasks import BaseTask
-
-from main import settings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -288,36 +288,38 @@ class TaskGuideImport(BaseTask):
 
 class TaskGuideDownload(BaseTask):
     def _get_channel(self, station):
-        number = station.channel.lstrip('0')
+        station_number = station.channel.lstrip('0')
 
         # Try for an exact match:
         try:
             return Channel.objects.get(
-                number=number, callsign=station.callsign)
+                number=station_number, callsign=station.callsign)
 
         except Channel.DoesNotExist:
             pass
 
         try:
             channel_obj = Channel.objects.get(
-                Q(number=number) | Q(callsign=station.callsign))
+                Q(number=station_number) | Q(callsign=station.callsign))
 
         except Channel.MultipleObjectsReturned:
             LOGGER.warning(
-                'Multiple channels match: %s, %s', number, station.callsign)
+                'Multiple channels match: %s, %s', station_number,
+                station.callsign)
             return
 
         except Channel.DoesNotExist:
             LOGGER.warning(
-                'No match for channel: %s %s', number, station.callsign)
+                'No match for channel: %s %s', station_number,
+                station.callsign)
             return
 
         # Warn on this since we potentially destroy data...
-        if channel_obj.number != number or \
-            channel_obj.callsign != callsign:
+        if channel_obj.number != station_number or \
+            channel_obj.callsign != station.callsign:
             LOGGER.warning(
                 'Partial channel match: (%s, %s) ~= (%s, %s)',
-                channel_obj.number, channel_obj.callsign, number,
+                channel_obj.number, channel_obj.callsign, station_number,
                 station.callsign)
 
         channel_obj.update(
@@ -401,17 +403,16 @@ class TaskGuideDownload(BaseTask):
             LOGGER.info('No tuners. Automatic guide download cannot proceed.')
             return
 
-        if settings.GUIDE_METHOD != 'schedulesdirect':
+        if config.GUIDE_METHOD != 'schedulesdirect':
             LOGGER.info('Automatic guide download disabled.')
             return
 
-        if not settings.GUIDE_SD_USERNAME or not settings.GUIDE_SD_PASSWORD:
+        if not config.GUIDE_SD_USER or not config.GUIDE_SD_PASS:
             LOGGER.warning('Aborting, no schedules direct credentials.')
             return
 
-        store = PickleStore(settings.STORAGE_TEMP)
-        sd = SDGrabber(
-            settings.GUIDE_SD_USERNAME, settings.GUIDE_SD_PASSWORD, store)
+        store = PickleStore(config.STORAGE_TEMP)
+        sd = SDGrabber(config.GUIDE_SD_USER, config.GUIDE_SD_PASS, store)
         sd.login()
 
         count = 0

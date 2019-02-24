@@ -17,7 +17,7 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 
-from main import settings
+from constance import config
 
 
 LOGGER = logging.getLogger(__name__)
@@ -507,7 +507,7 @@ class Show(Media):
     play_count = models.IntegerField(default=0)
     path = FilePathField(
         max_length=256, must_exist=False, auto_create_parent=True,
-        auto_create=False, relative_to=settings.STORAGE_MEDIA)
+        auto_create=False, relative_to=config.STORAGE_MEDIA)
 
     def __str__(self):
         return self.program.title
@@ -635,7 +635,7 @@ class Movie(Media):
     play_count = models.IntegerField(default=0)
     path = FilePathField(
         max_length=256, must_exist=False, auto_create_parent=True,
-        auto_create=False, relative_to=settings.STORAGE_MEDIA)
+        auto_create=False, relative_to=config.STORAGE_MEDIA)
 
     objects = MovieManager()
 

@@ -30,6 +30,9 @@ update:
 superuser:
 	pipenv run python dsdvr/manage.py createsuperuser
 
+shell:
+	pipenv run python dsdvr/manage.py shell
+
 run:
 	pipenv run python dsdvr/manage.py runserver
 

@@ -7,11 +7,12 @@ from ffmpeg._run import Error as FfmpegError
 
 from django.db.transaction import atomic
 
+from constance import config
+
 from api.tasks import BaseTask
 from api.models import (
     Media, Series, Category, Rating, Episode, Person, MediaActor,
 )
-from main.settings import OMDB_API_KEY
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,8 +28,8 @@ def _omdb_client():
     global _OMDB
 
     if _OMDB is None:
-        LOGGER.debug('Making client with API key: %s', OMDB_API_KEY)
-        _OMDB = omdb.OMDBClient(apikey=OMDB_API_KEY)
+        LOGGER.debug('Making client with API key: %s', config.OMDB_API_KEY)
+        _OMDB = omdb.OMDBClient(apikey=config.OMDB_API_KEY)
 
     return _OMDB
 

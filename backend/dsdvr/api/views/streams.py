@@ -21,12 +21,13 @@ from django.shortcuts import get_object_or_404
 from django.db.transaction import atomic
 from django.utils import timezone
 
+from constance import config
+
 from rest_framework import viewsets
 from rest_framework import status
 
 from api.models import Stream
 from api.serializers import StreamSerializer
-from main import settings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -294,7 +295,7 @@ class CreatingStreamSerializer(StreamSerializer):
         obj = super().create(validated_data)
 
         temp = tempfile.mkdtemp(
-            prefix='.stream-%s-' % obj.id, dir=settings.STORAGE_TEMP)
+            prefix='.stream-%s-' % obj.id, dir=config.STORAGE_TEMP)
         playlist = pathjoin(temp, 'stream.m3u8')
 
         # TODO: we need to detect the existing format and decide whether to

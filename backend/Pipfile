@@ -4,8 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-docopt = "*"
-schema = "*"
 libhdhomerun = {git = "https://github.com/btimby/python-libhdhomerun.git"}
 ffmpeg-python = "*"
 python-xmltv = "*"
@@ -14,10 +12,8 @@ pylint = "*"
 requests = "*"
 django = "*"
 django-rest-framework = "*"
-django-siteprefs = "*"
 croniter = "*"
 sentry-sdk = "*"
-drf-ujson = "*"
 m3u8 = {git = "https://github.com/btimby/m3u8.git"}
 psutil = "*"
 django-webpack-loader = "*"
@@ -29,3 +25,4 @@ djangorestframework-queryfields = "*"
 python-daemon = "*"
 pylast = "*"
 sdgrabber = {git = "https://github.com/btimby/pysd.git"}
+django-constance = {extras = ["database"],version = "*"}

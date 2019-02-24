@@ -23,6 +23,7 @@ from api.views.series import SeriesViewSet
 from api.views.me import MeView
 from api.views.status import StatusView
 from api.views.images import ImageViewSet, image
+from api.views.settings import SettingViewSet
 
 
 router = DefaultRouter()
@@ -42,6 +43,7 @@ router.register('programs', ProgramViewSet, base_name='programs')
 router.register('media', MediaViewSet, base_name='media')
 router.register('series', SeriesViewSet, base_name='series')
 router.register('images', ImageViewSet, base_name='images')
+router.register('settings', SettingViewSet, base_name='settings')
 
 
 urlpatterns = [

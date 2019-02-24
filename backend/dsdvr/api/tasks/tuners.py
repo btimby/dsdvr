@@ -75,7 +75,7 @@ class TaskTunerDiscover(BaseTask):
                     ipaddr, model, tuner_count)
 
                 try:
-                    tuner = Tuner.objects.get(name=name)
+                    tuner = Tuner.objects.get(device_id=name)
 
                 except Tuner.DoesNotExist:
                     tuner = Tuner.objects.create(
@@ -91,7 +91,7 @@ class TaskTunerDiscover(BaseTask):
         Imports XML channel lineup from HDHomeRun tuner.
         '''
         # Stream XML from HDHomeRun:
-        url = 'http://%s/lineup.xml' % tuner.ipaddr
+        url = 'http://%s/lineup.xml' % tuner.device_ip
 
         LOGGER.info('Syncing tuner channel lineup from %s', url)
 
