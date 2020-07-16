@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "axios": "^0.18.0",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.19",
     "video.js": "^7.4.1",
     "videojs-dock": "^2.1.4",
     "videojs-dvr": "^1.3.3",
